@@ -200,11 +200,20 @@ function describeError(error: GitHubApiError | null): { title: string; body: str
         title: messages.loadErrors.notFoundTitle,
         body: messages.loadErrors.notFoundBody,
       };
+    // 401 and 403 are both permission-denied, but they point at different
+    // fixes: a rejected token versus a token that works and cannot see this
+    // repository. Collapsing them sent people to check the repository when the
+    // token was the problem.
     case "permission-denied":
-      return {
-        title: messages.loadErrors.permissionTitle,
-        body: messages.loadErrors.permissionBody,
-      };
+      return error.status === 401
+        ? {
+            title: messages.loadErrors.tokenRejectedTitle,
+            body: messages.loadErrors.tokenRejectedBody,
+          }
+        : {
+            title: messages.loadErrors.permissionTitle,
+            body: messages.loadErrors.permissionBody,
+          };
     case "rate-limited": {
       const resetAt = error.resetAt;
       const suffix =

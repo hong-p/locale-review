@@ -144,8 +144,12 @@ export const messages = {
     notFoundTitle: "Pull request not found",
     notFoundBody:
       "It may not exist, or your token may not have access to the repository. GitHub reports both the same way.",
-    permissionTitle: "Access denied",
-    permissionBody: "Your token does not have access to this repository.",
+    tokenRejectedTitle: "Your token was rejected",
+    tokenRejectedBody:
+      "GitHub did not accept the token. It may be expired, revoked, or mistyped. Set it again on the start screen.",
+    permissionTitle: "This token cannot see that repository",
+    permissionBody:
+      "GitHub accepted the token but refused the repository. A fine-grained token only reaches the repositories it was granted, and reading a public repository you do not own needs Public Repositories (read-only) on the token. Check the token's repository access, or use a classic token with the public_repo scope.",
     rateLimitTitle: "GitHub rate limit reached",
     rateLimitBody: "No further requests will succeed until the limit resets.",
     rateLimitResetsAt: "Resets at",
