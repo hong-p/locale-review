@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Cancel superseded runs on the same ref; the full matrix is expensive.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # plan.md 8: the gate commands run as one job so a phase cannot be closed
+  # while any of them fails.
+  checks:
+    name: Typecheck, lint, unit tests, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      - run: npm run lint
+
+      - run: npm run format:check
+
+      - run: npm run test
+
+      - run: npm run build
+
+      - name: Report bundle size
+        # plan.md 3.10 asks for the initial entry gzip size to be recorded so
+        # an unexpected jump is visible in review.
+        run: |
+          {
+            echo "### Bundle size"
+            echo
+            echo '| File | Raw | Gzip |'
+            echo '| --- | ---: | ---: |'
+            for file in dist/assets/*.js dist/assets/*.css; do
+              [ -e "$file" ] || continue
+              raw=$(wc -c < "$file" | tr -d ' ')
+              gzip=$(gzip -c "$file" | wc -c | tr -d ' ')
+              echo "| $(basename "$file") | $((raw / 1024)) kB | $((gzip / 1024)) kB |"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          retention-days: 7
+
+  browser:
+    name: Browser tests (${{ matrix.project }})
+    runs-on: ubuntu-latest
+    needs: checks
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx playwright install --with-deps ${{ matrix.project }}
+
+      - run: npm run build
+
+      - run: npm run test:e2e -- --project=${{ matrix.project }}
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-${{ matrix.project }}
+          path: playwright-report
+          retention-days: 7
