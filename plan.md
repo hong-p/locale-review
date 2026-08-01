@@ -55,6 +55,7 @@
 - Octokit은 사용하지 않고 브라우저 표준 `fetch`를 감싼 작은 타입 기반 API wrapper를 직접 구현한다.
 - REST와 GraphQL 요청의 인증, API version, Accept 헤더, 오류 변환을 공통 처리한다.
 - REST pagination은 `Link` 헤더를 해석하는 공통 유틸로 구현한다.
+- GraphQL pagination은 `Link` 헤더가 아니라 connection의 `pageInfo.hasNextPage`와 `endCursor`를 사용하는 별도 유틸로 구현한다. REST 유틸을 GraphQL에 재사용하지 않는다.
 - `x-ratelimit-*`, `retry-after` 헤더를 내부 오류 모델로 변환한다.
 - JSON과 raw content 응답을 명시적으로 분리한다.
 - `AbortController`로 PR 및 파일 전환 시 불필요한 조회를 취소한다.
@@ -190,7 +191,7 @@ src/
 - 파일명에 점이 여러 개 있어도 임의 구간을 locale로 추측하지 않고 설정된 locale 또는 감지 가능한 BCP 47 형태의 마지막 접미사만 후보로 취급한다.
 - 한 PR에 디렉터리형과 접미사형이 섞여 있으면 활성화된 내장 규칙별로 감지하고, 하나의 파일이 여러 규칙에 일치하면 모호한 매핑으로 표시해 사용자가 규칙을 선택하게 한다.
 - 원문 locale은 대상 locale 필터에서 제외한다.
-- 일치하는 파일이 없으면 `No translation files found`와 현재 패턴을 보여주고 설정 수정 및 재시도 동작을 제공한다.
+- 일치하는 파일이 없으면 `No translation files found`와 현재 적용 중인 레이아웃 설정을 보여주고 설정 수정 및 재시도 동작을 제공한다.
 
 ### 4.3 선호 locale과 PR별 필터
 
@@ -224,7 +225,7 @@ src/
 - 삭제: 원문 / 변경 전 번역 / 빈 변경 후
 - 이름 변경: 이전 경로와 새 경로를 표시하고 내용을 비교
 - 대응 원문 없음: 번역 diff는 유지하면서 `Source file not found` 표시
-- 바이너리 파일과 설정 패턴에서 제외된 파일은 표시하지 않음
+- 바이너리 파일과 활성 레이아웃 규칙에 해당하지 않는 파일은 표시하지 않음
 
 GitHub PR diff와 동일한 기준을 사용하기 위해 `pull.base.sha`를 변경 전 기준으로 직접 사용하지 않는다. Compare API의 `merge_base_commit.sha`를 조회하고 이를 변경 전 파일의 기준 커밋으로 사용한다. 이렇게 해야 PR 생성 후 base 브랜치에 추가된 무관한 변경이 기존 번역에 섞이지 않는다.
 
@@ -300,13 +301,17 @@ GitHub patch 정보와 브라우저에서 계산한 라인 diff를 함께 사용
 - 댓글 API에는 GitHub의 full media type을 사용해 raw 본문과 GitHub가 렌더링한 HTML을 한 응답에서 받는다.
 - 댓글 표시는 GitHub의 `body_html`을 DOMPurify로 다시 정제한 뒤 사용한다. 검증되지 않은 HTML을 직접 삽입하지 않는다.
 - 댓글 작성, 편집용 값과 복사에는 raw `body`를 사용한다.
-- 외부 링크에는 안전한 `rel` 속성을 강제하고 이미지 URL은 CSP 허용 origin 정책을 따른다.
+- 외부 링크에는 안전한 `rel` 속성을 강제한다.
+- 댓글 본문의 이미지는 앱에서 직접 표시하지 않는다. DOMPurify 단계에서 `<img>`를 원본 URL을 가리키는 링크로 치환한다. 이렇게 하면 CSP `img-src`를 아바타 origin 외로 넓히지 않아도 되고 원격 이미지 요청 자체가 발생하지 않는다.
+- 이 방식에서는 GitHub 커스텀 이모지처럼 이미지로 렌더링되는 일부 요소도 링크로 표시된다. 1차 버전에서는 이를 허용 가능한 제약으로 둔다.
 - 조회 데이터에서 확인 가능한 경우 resolved 상태는 표시하되 Resolve/Unresolve 조작은 1차 버전에서 제외한다.
 
 ### 4.9 댓글과 리뷰 작성
 
 - 자체 계산한 diff는 화면 표시에만 사용한다. 댓글 가능 라인은 GitHub가 제공한 patch hunk를 기준으로 판정한다.
+- 인라인 댓글은 변경 전과 변경 후 패널에서만 작성할 수 있다. 원문 패널은 표시 전용이며 댓글 UI를 제공하지 않는다. 원문 파일은 번역 PR의 diff에 포함되지 않는 것이 일반적이라 GitHub이 해당 위치의 댓글을 받지 않는다.
 - 새 인라인 댓글은 deprecated되는 `position` 대신 `commit_id`(현재 head SHA), `path`, `line`, `side`를 사용한다. 여러 줄 댓글에는 `start_line`, `start_side`도 사용한다.
+- 변경 전 패널의 댓글은 `side: "LEFT"`, 변경 후 패널의 댓글은 `side: "RIGHT"`로 보낸다. 두 side는 줄번호 기준 파일이 다르므로 화면 줄번호를 그대로 사용하지 않고 patch hunk에서 해당 side의 라인으로 변환한다.
 - patch가 없거나 잘려 안전한 위치를 계산할 수 없는 파일은 전체 파일 비교는 허용하되 인라인 댓글을 비활성화하고 이유를 표시한다.
 - PR files API의 최대 3,000개 파일 제한을 감지하고 불완전한 결과를 정상 완료로 표시하지 않는다.
 - 다음 두 가지 흐름을 모두 지원한다.
@@ -371,7 +376,7 @@ GitHub patch 정보와 브라우저에서 계산한 라인 diff를 함께 사용
 - 테마 선택
 - 원문 locale
 - 선호 대상 locale
-- 번역 경로 및 확장자 패턴
+- 번역 레이아웃 설정: 레이아웃 종류, 콘텐츠 루트, 파일 확장자, 접미사형 원문 locale 포함 여부
 - 사용자가 Remember를 선택한 경우에만 토큰
 
 `sessionStorage`에 저장할 항목:
@@ -407,6 +412,8 @@ REST와 GraphQL 세부 구현이 UI 컴포넌트에 노출되지 않도록 타�
 - 변경 파일의 `viewerViewedState` 조회
 - 파일 Viewed 처리
 - 파일 Viewed 해제
+
+`viewerViewedState`는 `pullRequest.files` connection에서 조회하므로 커서 기반 pagination을 끝까지 따라간다. 첫 페이지만 조회해 파일 수가 많은 PR에서 Viewed 상태가 조용히 누락되지 않게 한다. 변경 파일 목록은 REST, Viewed 상태는 GraphQL에서 오므로 두 결과를 파일 경로 기준으로 결합하고, 한쪽에만 존재하는 항목을 정상 상태로 처리하지 않는다.
 
 GitHub 응답에 pagination이 있으면 모두 처리한다. PR이나 파일을 전환할 때 이전 요청을 취소하고 보수적인 메모리 캐시를 사용한다. 오류 형식은 하나로 통일한다. 댓글이나 리뷰가 중복 등록될 수 있는 mutation은 자동 재시도하지 않는다.
 
@@ -569,7 +576,7 @@ npm run build
 
 1. 토큰의 세션 저장, Remember, 삭제 동작을 구현한다.
 2. 연결 테스트와 기능별 권한 상태를 구현한다.
-3. 원문 locale, 선호 locale, 파일 패턴 설정을 구현한다.
+3. 원문 locale, 선호 locale, 번역 레이아웃 설정을 구현한다.
 4. PR URL 파싱, hash 이동, PR 정보 조회, 표준 오류 상태를 구현한다.
 5. 빈 시작 화면과 PR 헤더를 만든다.
 
@@ -578,7 +585,7 @@ npm run build
 ### 2단계: 번역 파일 발견과 데이터 모델
 
 1. pagination을 포함해 변경 파일 전체를 조회한다.
-2. 번역 패턴을 적용하고 locale을 감지한다.
+2. 번역 레이아웃 규칙을 적용하고 locale을 감지한다.
 3. locale 디렉터리형과 파일명 접미사형 매핑 및 접미사 없는 기본 원문 규칙을 구현한다.
 4. 선호 및 PR별 locale 필터를 구현한다.
 5. 원문, 변경 전, 변경 후의 경로와 ref를 계산한다.
@@ -647,11 +654,14 @@ npm run build
 ### 단위 테스트
 
 - GitHub PR URL 파싱 및 hash 경로 생성
-- glob 및 경로 패턴 매칭
+- 두 내장 번역 레이아웃 규칙의 경로 매칭
 - locale 감지 및 원문 경로 계산
 - 디렉터리형, 접미사형, 접미사 없는 기본 원문, `_index.ko.md`, `guide.ko-KR.md`, 여러 점이 포함된 파일명의 경로 매핑
 - 이름 변경, 추가, 삭제, 원문 누락 데이터 모델
+- 동일 저장소 PR과 포크 PR의 base/head 저장소 식별, merge base SHA와 head SHA 결정, 파일별 조회 대상 ref 계산
+- 포크 저장소가 삭제되거나 비공개로 전환된 경우의 PR ref, head SHA, blob SHA fallback 순서와 최종 실패 상태
 - 라인 diff와 GitHub 댓글 위치 매핑
+- `LEFT`/`RIGHT` side별 댓글 라인 변환과 원문 패널 댓글 비활성화 판정
 - 영문 단어, 한국어·중국어·일본어, emoji/결합문자, 긴 줄, 완전 교체 라인의 intra-line diff와 fallback
 - 비율 기반 스크롤 계산
 - 안전한 local/session storage 파싱과 마이그레이션
@@ -667,7 +677,7 @@ npm run build
 - 전체 파일 표시와 Changes only 전환
 - Viewed mutation 성공 및 실패 시 롤백
 - 댓글과 리뷰 초안 보존
-- GitHub 댓글 HTML 정제, 위험 속성 제거, 안전한 링크 및 이미지 처리
+- GitHub 댓글 HTML 정제, 위험 속성 제거, 안전한 링크 처리, `<img>`의 링크 치환
 - Light/Dark/System 테마
 - 빈 화면, 로딩, 권한, rate limit, 번역 파일 없음 상태
 - 공식 검증 locale별 방향 속성, 혼합 RTL/LTR 문자열, locale 필터와 패널 방향
@@ -676,6 +686,10 @@ npm run build
 
 - 토큰 없이 PR 열기가 차단되고 토큰 설정 안내가 표시되는지 확인
 - 인증 후 권한이 있는 PR fixture 열기
+- 포크 PR fixture에서 원문/변경 전은 base 저장소, 변경 후는 head 저장소에서 조회되는지 확인
+- 포크 저장소를 조회할 수 없는 fixture에서 fallback으로 변경 후 파일이 표시되는지, fallback도 실패하면 명시적 오류 상태가 표시되는지 확인
+- 원문 패널에 댓글 UI가 없고 변경 전/변경 후 패널의 댓글이 각각 `LEFT`/`RIGHT`로 제출되는지 확인
+- patch가 없어 인라인 댓글이 비활성화된 파일에서 사유가 표시되는지 확인
 - locale 및 파일 선택, 변경 탐색, sync, 텍스트 검색
 - 파일 전환 시 lazy fetch, 캐시 재사용, 스크롤 위치 복원, 새 head SHA의 캐시 무효화
 - Viewed 설정 및 해제
@@ -726,6 +740,7 @@ mutation 테스트는 기본적으로 모두 mock API를 사용하며 임의의 
 - 사용자 및 저장소 텍스트는 텍스트로 표시하거나 검증된 방식으로 안전하게 처리한다.
 - 외부 런타임 스크립트를 사용하지 않는다.
 - GitHub Pages의 제약 안에서 meta 기반 Content Security Policy를 적용한다. 최소한 `default-src 'self'`, `script-src 'self'`, `style-src 'self'`, `connect-src 'self' https://api.github.com`, `img-src 'self' data: https://avatars.githubusercontent.com`, `object-src 'none'`, `base-uri 'none'`, `form-action 'none'`을 기준으로 한다.
+- `img-src`는 아바타 origin까지만 허용한다. 리뷰 댓글 본문의 이미지는 표시하지 않고 링크로 치환하므로 `*.githubusercontent.com`이나 첨부 파일 origin으로 범위를 넓히지 않는다.
 - meta CSP에서는 `frame-ancestors`, report 전송 등 일부 지시어를 사용할 수 없다는 한계를 문서화한다.
 - XSS가 발생하면 `sessionStorage`의 토큰도 노출될 수 있다. 세션 저장은 노출 시간을 줄이는 수단이지 XSS 방어책이 아님을 사용자 문서에 명시한다.
 - mutation은 검증된 토큰과 사용자의 명시적 동작이 있을 때만 실행한다.

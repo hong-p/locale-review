@@ -1,10 +1,41 @@
 <!doctype html>
-<html lang="ko">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="원문과 번역 변경을 나란히 검토하는 정적 웹앱" />
-    <meta name="theme-color" content="#17241f" />
+
+    <!--
+      plan.md 10. GitHub Pages cannot set response headers, so the policy is
+      delivered as a meta tag. That form cannot express frame-ancestors or a
+      report endpoint; docs/deployment.md records the limitation.
+
+      style-src needs 'unsafe-inline' only because Vite injects the stylesheet
+      link and React writes the panel column count as an inline custom
+      property. connect-src is api.github.com alone, which is what keeps the
+      token from reaching anywhere else even if a bug tried.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="
+        default-src 'self';
+        script-src 'self';
+        style-src 'self' 'unsafe-inline';
+        img-src 'self' data: https://avatars.githubusercontent.com;
+        font-src 'self';
+        connect-src 'self' https://api.github.com;
+        form-action 'none';
+        base-uri 'none';
+        object-src 'none';
+        manifest-src 'self'
+      "
+    />
+    <meta
+      name="description"
+      content="Review translation pull requests with source, previous, and proposed text side by side."
+    />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0d1117" />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
     <title>Locale Review</title>
   </head>
   <body>

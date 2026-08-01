@@ -1,0 +1,136 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-2);
+  background-color: var(--color-canvas);
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: var(--border-width) solid var(--color-border);
+  background-color: var(--color-canvas-subtle);
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-muted);
+}
+
+.title {
+  font-weight: 600;
+  color: var(--color-fg);
+}
+
+.scroller {
+  flex: 1;
+  overflow: auto;
+  /* The panels sit in a grid track; a fixed height keeps all three aligned
+     and gives the proportional sync something to measure. */
+  max-height: 60vh;
+}
+
+.lines {
+  display: table;
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-diff);
+  tab-size: 2;
+}
+
+.line {
+  display: table-row;
+}
+
+.number {
+  display: table-cell;
+  width: 1%;
+  padding: 0 var(--space-2);
+  text-align: right;
+  vertical-align: top;
+  user-select: none;
+  color: var(--color-fg-muted);
+  background-color: var(--color-canvas-subtle);
+  border-right: var(--border-width) solid var(--color-border-muted);
+  /* Line numbers stay left-to-right even beside right-to-left text
+     (plan.md 4.4). */
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+.marker {
+  display: table-cell;
+  width: 1ch;
+  padding-left: var(--space-2);
+  vertical-align: top;
+  user-select: none;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+.text {
+  display: table-cell;
+  padding: 0 var(--space-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  /* Isolation keeps a right-to-left paragraph from reordering the cells
+     around it. */
+  unicode-bidi: isolate;
+}
+
+.added {
+  background-color: var(--color-diff-add-bg);
+}
+
+.added .number {
+  background-color: var(--color-diff-add-bg);
+  box-shadow: inset 2px 0 0 var(--color-diff-add-border);
+}
+
+.removed {
+  background-color: var(--color-diff-delete-bg);
+}
+
+.removed .number {
+  background-color: var(--color-diff-delete-bg);
+  box-shadow: inset 2px 0 0 var(--color-diff-delete-border);
+}
+
+/* Intra-line highlighting, the narrower signal inside a changed line. */
+.wordAdded {
+  background-color: var(--color-diff-word-add-bg);
+  border-radius: var(--radius-1);
+}
+
+.wordRemoved {
+  background-color: var(--color-diff-word-delete-bg);
+  border-radius: var(--radius-1);
+}
+
+.searchHit {
+  outline: 2px solid var(--color-attention-fg);
+  outline-offset: -2px;
+}
+
+.gap {
+  display: table-row;
+  color: var(--color-fg-muted);
+  background-color: var(--color-canvas-inset);
+}
+
+.gapText {
+  display: table-cell;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
+.empty {
+  padding: var(--space-5);
+  text-align: center;
+  color: var(--color-fg-muted);
+}

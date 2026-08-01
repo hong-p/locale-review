@@ -1,0 +1,21 @@
+import { HttpResponse, http } from "msw";
+import type { RequestHandler } from "msw";
+
+export const GITHUB_API_ORIGIN = "https://api.github.com";
+
+/**
+ * Default handlers applied to every test run.
+ *
+ * Only requests the app makes on its own belong here. Everything a specific
+ * feature needs is registered per test with `server.use(...)`, so the shared
+ * baseline stays small and a missing handler still fails loudly.
+ */
+export const handlers: RequestHandler[] = [
+  // Once a token exists the app resolves who it belongs to, without waiting for
+  // the Test connection button, because the review flow needs the login to find
+  // this user's pending review (plan.md 4.9). A test that overrides this to
+  // assert on connection failures can still do so with server.use.
+  http.get(`${GITHUB_API_ORIGIN}/user`, () =>
+    HttpResponse.json({ login: "translator", avatar_url: null, html_url: null }),
+  ),
+];
