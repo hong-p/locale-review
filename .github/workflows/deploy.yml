@@ -1,0 +1,84 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# The deployment is the artifact of whatever landed last; a superseded run has
+# nothing worth finishing, but an in-flight deploy is left to complete.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  # plan.md 8 phase 7: the same gate that closes a phase locally has to pass
+  # before anything is published.
+  gate:
+    name: Quality gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      - run: npm run lint
+
+      - run: npm run format:check
+
+      - run: npm run test
+
+      - run: npx playwright install --with-deps chromium
+
+      - run: npm run build
+
+      - run: npm run test:e2e -- --project=chromium
+
+  build:
+    name: Build the site
+    runs-on: ubuntu-latest
+    needs: gate
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build
+
+      # Vite emits relative asset paths and the app uses hash routing, so the
+      # same bundle works from a repository subpath with no base-path build
+      # flag (plan.md 8 phase 7).
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      # GitHub Pages serves this over HTTPS, which plan.md 10 requires.
+      - id: deployment
+        uses: actions/deploy-pages@v4

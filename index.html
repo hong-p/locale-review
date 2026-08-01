@@ -3,6 +3,32 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!--
+      plan.md 10. GitHub Pages cannot set response headers, so the policy is
+      delivered as a meta tag. That form cannot express frame-ancestors or a
+      report endpoint; docs/deployment.md records the limitation.
+
+      style-src needs 'unsafe-inline' only because Vite injects the stylesheet
+      link and React writes the panel column count as an inline custom
+      property. connect-src is api.github.com alone, which is what keeps the
+      token from reaching anywhere else even if a bug tried.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="
+        default-src 'self';
+        script-src 'self';
+        style-src 'self' 'unsafe-inline';
+        img-src 'self' data: https://avatars.githubusercontent.com;
+        font-src 'self';
+        connect-src 'self' https://api.github.com;
+        form-action 'none';
+        base-uri 'none';
+        object-src 'none';
+        manifest-src 'self'
+      "
+    />
     <meta
       name="description"
       content="Review translation pull requests with source, previous, and proposed text side by side."
