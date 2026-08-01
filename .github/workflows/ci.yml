@@ -14,18 +14,28 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  # The Node version used wherever the matrix does not apply.
+  PRIMARY_NODE: 24
+
 jobs:
   # plan.md 8: the gate commands run as one job so a phase cannot be closed
   # while any of them fails.
   checks:
-    name: Typecheck, lint, unit tests, build
+    name: Checks (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 22 is the engines floor; 24 is what development runs on. Testing
+        # only one of them leaves the other unverified.
+        node: [22, 24]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: ${{ matrix.node }}
           cache: npm
 
       - run: npm ci
@@ -42,7 +52,8 @@ jobs:
 
       - name: Report bundle size
         # plan.md 3.10 asks for the initial entry gzip size to be recorded so
-        # an unexpected jump is visible in review.
+        # an unexpected jump is visible in review. One version is enough.
+        if: matrix.node == env.PRIMARY_NODE
         run: |
           {
             echo "### Bundle size"
@@ -57,7 +68,9 @@ jobs:
             done
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/upload-artifact@v4
+      # Uploaded once: artifact names must be unique across a matrix.
+      - uses: actions/upload-artifact@v7
+        if: matrix.node == env.PRIMARY_NODE
         with:
           name: dist
           path: dist
@@ -72,11 +85,11 @@ jobs:
       matrix:
         project: [chromium, firefox, webkit]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: ${{ env.PRIMARY_NODE }}
           cache: npm
 
       - run: npm ci
@@ -87,7 +100,7 @@ jobs:
 
       - run: npm run test:e2e -- --project=${{ matrix.project }}
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: playwright-report-${{ matrix.project }}
