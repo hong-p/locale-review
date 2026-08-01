@@ -251,7 +251,9 @@ describe("states the reviewer has to be told about", () => {
 
     renderBrowser();
 
-    expect(await screen.findByText(/inline comments unavailable/i)).toBeVisible();
+    // The warning appears on the sidebar entry and again beside the viewer.
+    const warnings = await screen.findAllByText(/inline comments unavailable/i);
+    expect(warnings.length).toBeGreaterThan(0);
   });
 
   it("shows the rename's previous path", async () => {
@@ -269,7 +271,9 @@ describe("states the reviewer has to be told about", () => {
 
     renderBrowser();
 
-    expect(await screen.findByText(/renamed from/i)).toBeVisible();
-    expect(screen.getByText(/content\/ko\/guide\.md/)).toBeVisible();
+    // Shown on the sidebar entry and again above the viewer.
+    const labels = await screen.findAllByText(/renamed from/i);
+    expect(labels.length).toBeGreaterThan(0);
+    expect(labels[0].textContent).toContain("content/ko/guide.md");
   });
 });

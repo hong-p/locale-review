@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 
 import type { PullRequestDiffBase, PullRequestRef } from "../../api/types";
 import { messages } from "../../messages/en";
+import { ThreeColumnDiff } from "../diff/ThreeColumnDiff";
 import {
   filterFilesByLocale,
   hiddenFileCount,
@@ -11,6 +12,7 @@ import {
 import { DEFAULT_LAYOUT } from "../settings/translationLayout";
 import { FileSidebar } from "./FileSidebar";
 import { buildTranslationFileModel } from "./translationFileModel";
+import type { FileContent } from "./fetchFileContent";
 import { useChangedFiles, useFileVersions } from "./useFileVersions";
 
 /**
@@ -58,6 +60,11 @@ export function TranslationFileBrowser({ pullRequestRef, diffBase }: Translation
 
   const versions = useFileVersions(selectedFile, diffBase);
 
+  // The patch stays on the raw changed file rather than the model, since only
+  // the viewer and the comment layer need it.
+  const selectedFilePatch =
+    changed.data?.files.find((file) => file.path === selectedFile?.id)?.patch ?? null;
+
   if (changed.isPending) return <p role="status">{messages.pullRequest.loading}</p>;
   if (!model) return null;
 
@@ -99,10 +106,25 @@ export function TranslationFileBrowser({ pullRequestRef, diffBase }: Translation
       {selectedFile && (
         <article aria-label={selectedFile.id}>
           <h2>{selectedFile.id}</h2>
-          {versions.isLoading && <p role="status">{messages.files.loadingContent}</p>}
-          {selectedFile.source === null && <p>{messages.files.sourceMissing}</p>}
-          {/* The three-column renderer replaces this in phase 3. */}
-          {versions.after?.state === "loaded" && <pre>{versions.after.text}</pre>}
+          {selectedFile.previousPath !== null && (
+            <p>
+              {messages.files.renamedFrom} {selectedFile.previousPath}
+            </p>
+          )}
+          {versions.isLoading ? (
+            <p role="status">{messages.files.loadingContent}</p>
+          ) : (
+            <ThreeColumnDiff
+              sourceText={contentText(versions.source)}
+              beforeText={contentText(versions.before) ?? ""}
+              afterText={contentText(versions.after) ?? ""}
+              sourceLocale={DEFAULT_LAYOUT.sourceLocale}
+              targetLocale={selectedFile.locale}
+              patch={selectedFilePatch}
+              sourceMissing={selectedFile.source === null || versions.source?.state === "absent"}
+            />
+          )}
+          {!selectedFile.canComment && <p>{messages.files.noPatch}</p>}
         </article>
       )}
     </section>
@@ -111,3 +133,9 @@ export function TranslationFileBrowser({ pullRequestRef, diffBase }: Translation
 
 /** plan.md 4.3's default preferred locale, until settings expose it in the UI. */
 const DEFAULT_PREFERRED = ["ko"] as const;
+
+/** A version that is absent or unsupported renders as an empty panel. */
+function contentText(content: FileContent | undefined): string | null {
+  if (content?.state !== "loaded") return null;
+  return content.text;
+}

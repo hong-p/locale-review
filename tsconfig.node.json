@@ -3,7 +3,9 @@
     "composite": true,
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
     "target": "ES2022",
-    "lib": ["ES2023"],
+    // DOM is here for Playwright: a page.evaluate callback is serialised and
+    // run inside the browser, so it legitimately references browser globals.
+    "lib": ["ES2023", "DOM"],
     "skipLibCheck": true,
     "module": "ESNext",
     "moduleResolution": "Bundler",
