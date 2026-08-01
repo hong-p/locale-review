@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HashRouter } from "react-router";
 
+import { TokenProvider } from "../features/auth/TokenContext";
 import { ThemeProvider } from "../features/settings/theme";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { AppRoutes } from "./routes";
@@ -31,9 +32,11 @@ export function App() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
-          <HashRouter>
-            <AppRoutes />
-          </HashRouter>
+          <TokenProvider>
+            <HashRouter>
+              <AppRoutes />
+            </HashRouter>
+          </TokenProvider>
         </ThemeProvider>
       </QueryClientProvider>
     </ErrorBoundary>

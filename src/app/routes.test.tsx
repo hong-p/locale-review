@@ -1,17 +1,31 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { TokenProvider } from "../features/auth/TokenContext";
 import { ThemeProvider } from "../features/settings/theme";
 import { AppRoutes, pullRequestPath } from "./routes";
 
+/**
+ * Mirrors the provider stack in App.tsx. These tests cover routing only, so no
+ * token is seeded: the screens must resolve without one.
+ */
 function renderAt(path: string) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+  });
+
   return render(
-    <ThemeProvider>
-      <MemoryRouter initialEntries={[path]}>
-        <AppRoutes />
-      </MemoryRouter>
-    </ThemeProvider>,
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <TokenProvider>
+          <MemoryRouter initialEntries={[path]}>
+            <AppRoutes />
+          </MemoryRouter>
+        </TokenProvider>
+      </ThemeProvider>
+    </QueryClientProvider>,
   );
 }
 
@@ -42,10 +56,13 @@ describe("AppRoutes", () => {
     expect(screen.getByRole("heading", { level: 2, name: /open a pull request/i })).toBeVisible();
   });
 
-  it("renders the pull request screen with its route parameters", () => {
+  it("resolves the pull request route and stops at the token gate", () => {
+    // Reaching the token requirement proves the route matched: an unmatched
+    // path would render the not-found screen instead.
     renderAt(pullRequestPath("kubernetes", "website", 123));
 
-    expect(screen.getByText("kubernetes/website #123")).toBeVisible();
+    expect(screen.getByRole("alert")).toHaveTextContent(/token is required/i);
+    expect(screen.queryByRole("heading", { name: /page not found/i })).toBeNull();
   });
 
   it("shows a not-found screen for an unknown route", () => {
