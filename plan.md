@@ -19,9 +19,146 @@
 - Light / Dark / System 테마를 제공한다. 기본값은 System이며 사용자의 선택을 저장한다.
 - GitHub Enterprise Server 지원은 후속 범위로 미룬다.
 
-## 3. 1차 출시 범위
+## 3. 기술 스택과 구현 원칙
 
-### 3.1 PR 불러오기와 탐색
+### 3.1 애플리케이션 기반
+
+- React 19와 TypeScript를 유지한다.
+- 빌드 및 개발 서버는 Vite를 사용한다.
+- 서버 렌더링이나 서버 전용 기능이 필요하지 않으므로 Next.js 같은 서버 중심 프레임워크로 전환하지 않는다.
+- 브라우저 전용 정적 SPA로 빌드하며 GitHub Pages의 저장소 하위 경로에서도 동작하게 한다.
+- TypeScript는 strict 모드를 유지하고 API 응답, 저장 데이터, diff 모델에 명시적인 타입을 사용한다.
+
+### 3.2 상태 관리
+
+- GitHub 서버 데이터와 API 요청 상태는 TanStack Query로 관리한다.
+- TanStack Query의 query key에는 owner, repository, PR 번호, merge base SHA, head SHA, 파일 경로 등 캐시 정합성에 필요한 값을 포함한다.
+- 선택 파일 lazy fetch, 중복 요청 방지, 요청 취소, 로딩/오류 상태, 수동 갱신과 캐시 무효화에 TanStack Query를 사용한다.
+- 댓글, 리뷰, Viewed 같은 mutation은 중복 실행 위험이 있으므로 자동 retry를 사용하지 않는다.
+- 테마, 선택 패널, locale 필터 같은 앱 UI 상태는 React Context와 `useReducer`를 사용한다.
+- textarea, 모달, hover처럼 컴포넌트에 국한된 상태는 `useState`를 사용한다.
+- 토큰, 설정, 초안의 영속화는 별도 browser storage 모듈에서 담당한다.
+- Redux나 Zustand 같은 추가 전역 상태 라이브러리는 1차 버전에서 사용하지 않는다.
+
+### 3.3 라우팅
+
+- React Router의 `HashRouter`를 사용한다.
+- `/#/`는 토큰 및 PR URL 입력 시작 화면으로 사용한다.
+- `/#/github/:owner/:repo/pull/:number`는 직접 열고 공유할 수 있는 PR 리뷰 화면으로 사용한다.
+- 설정 화면은 hash route 또는 중첩 modal route로 정의해 뒤로가기 동작을 일관되게 유지한다.
+- GitHub Pages가 서버 측 rewrite를 제공하지 않아도 직접 링크와 새로고침이 동작해야 한다.
+- URL 파라미터는 라우터 진입 시 다시 검증하고 owner/repo/PR 번호를 정규화한다.
+- 뒤로가기, 앞으로가기, 직접 hash 접근과 잘못된 경로를 단위 및 Playwright 테스트에 포함한다.
+
+### 3.4 GitHub API 클라이언트
+
+- Octokit은 사용하지 않고 브라우저 표준 `fetch`를 감싼 작은 타입 기반 API wrapper를 직접 구현한다.
+- REST와 GraphQL 요청의 인증, API version, Accept 헤더, 오류 변환을 공통 처리한다.
+- REST pagination은 `Link` 헤더를 해석하는 공통 유틸로 구현한다.
+- `x-ratelimit-*`, `retry-after` 헤더를 내부 오류 모델로 변환한다.
+- JSON과 raw content 응답을 명시적으로 분리한다.
+- `AbortController`로 PR 및 파일 전환 시 불필요한 조회를 취소한다.
+- mutation은 자동 재시도하지 않는다.
+- GitHub 응답 전체를 앱에 전달하지 않고 사용하는 필드만 내부 타입으로 변환한다.
+- API wrapper는 MSW를 사용해 pagination, 권한, rate limit, raw 응답, GraphQL 오류를 집중 테스트한다.
+
+### 3.5 Diff 구현
+
+- 라인 및 줄 내부 diff에는 경량 `diff` 패키지(jsdiff)를 사용한다.
+- 완성형 코드 에디터나 diff viewer 컴포넌트는 도입하지 않는다.
+- `diff` 패키지는 화면용 라인 대응과 단어/문자 차이 계산에만 사용한다.
+- CJK 및 결합문자 처리는 `Intl.Segmenter` 결과와 문자/grapheme fallback을 조합한다.
+- GitHub patch 파싱, 댓글 가능한 라인 판정, 3열 화면 모델 변환은 앱 내부의 독립 모듈로 구현한다.
+- 자체 diff 결과를 GitHub 댓글 위치의 원본으로 사용하지 않는다.
+
+### 3.6 Markdown 원문 표시
+
+- Source/Before/After 파일은 렌더링된 문서가 아니라 Markdown 원문 텍스트로 표시한다.
+- 별도 syntax highlighting 패키지는 1차 버전에 도입하지 않는다.
+- Markdown 특수문자와 저장소 콘텐츠는 HTML로 해석하지 않고 안전한 텍스트 노드로 렌더링한다.
+- 고정폭 글꼴, 줄번호, GitHub 스타일 line/intra-line diff 강조를 우선한다.
+- diff 표시와 충돌할 수 있는 임의 HTML wrapping을 피한다.
+- Markdown syntax highlighting은 실제 사용자 요구가 확인되면 후속 기능으로 검토한다.
+
+### 3.7 스타일과 테마
+
+- Tailwind와 CSS-in-JS 라이브러리는 사용하지 않는다.
+- 색상, 간격, 테두리, 글꼴, diff 상태 등 전역 디자인 토큰은 CSS custom properties로 정의한다.
+- 컴포넌트별 스타일은 CSS Modules로 분리해 전역 클래스 충돌을 방지한다.
+- Light/Dark/System 테마는 루트의 `data-theme` 속성과 CSS 변수로 구현한다.
+- System 모드는 `prefers-color-scheme` 변경을 실시간 반영한다.
+- 반응형 레이아웃은 CSS media query를 사용한다.
+- 동적인 패널 열 개수처럼 런타임 계산이 필요한 값만 제한적으로 React inline style 또는 CSS 변수로 전달한다.
+- GitHub의 시각 구조를 참고하되 자체 디자인 토큰을 사용하고 GitHub CSS를 복사하거나 런타임으로 불러오지 않는다.
+- 아이콘은 `lucide-react`를 사용하며 실제 사용하는 SVG 아이콘만 번들에 포함되게 한다.
+- emoji나 운영체제 종속 문자 기호를 기능 아이콘으로 사용하지 않는다.
+- 아이콘 전용 버튼에는 `aria-label` 또는 동등한 접근성 이름을 반드시 제공한다.
+- locale 표시에 국기 아이콘을 사용하지 않고 locale 코드와 언어 이름을 사용한다.
+
+### 3.8 런타임 데이터 검증과 저장 형식
+
+- Zod 같은 런타임 스키마 패키지는 추가하지 않는다.
+- GitHub API wrapper에서 앱이 실제 사용하는 필드만 작은 type guard와 parser로 검증한다.
+- 외부 API 응답을 TypeScript 타입으로 단순 단언하지 않는다.
+- localStorage와 sessionStorage 데이터에는 schema version을 포함한다.
+- 저장 데이터를 읽을 때 JSON 파싱 오류, 필드 누락, 잘못된 enum과 구버전 형식을 처리한다.
+- 복구할 수 없는 저장 데이터는 해당 항목만 삭제하고 안전한 기본값으로 되돌린다.
+- 저장 데이터 마이그레이션과 손상 복구는 단위 테스트로 검증한다.
+
+### 3.9 코드 구조
+
+기능 중심 구조를 사용하되 지나치게 깊은 추상화는 피한다. 예상 구조는 다음과 같다.
+
+```text
+src/
+  app/          앱 진입점, 라우터, provider, 전역 오류 경계
+  api/          GitHub REST/GraphQL fetch wrapper, pagination, 오류 모델
+  features/
+    auth/       토큰 설정, 연결 테스트, 권한 상태
+    pull/       PR URL, 메타데이터, freshness 확인
+    locales/    locale 감지, 경로 매핑, 방향 결정
+    files/      파일 목록, lazy content 조회, 파일 선택
+    diff/       patch 파싱, line/intra-line diff, 3열 모델
+    comments/   기존 댓글, 답글, 즉시 댓글, pending review
+    viewed/     GraphQL Viewed 상태
+    settings/   테마, locale 규칙, 저장소 설정
+  components/   여러 feature에서 재사용하는 작은 UI 컴포넌트
+  storage/      versioned localStorage/sessionStorage adapter와 migration
+  styles/       전역 토큰, reset, theme
+  test/         공통 fixture builder, MSW handler, 테스트 유틸
+```
+
+- feature 내부에서만 쓰는 컴포넌트, hook, 타입은 해당 feature에 둔다.
+- API response 타입과 화면 view model을 분리한다.
+- patch 파싱, 경로 매핑, diff 계산, 저장소 parser는 React에 의존하지 않는 순수 함수로 작성한다.
+- 범용화를 예상해 이른 시점에 공통 abstraction을 만들지 않고 실제 두 곳 이상에서 재사용될 때 추출한다.
+- barrel export를 과도하게 만들지 않아 순환 의존성과 tree-shaking 문제를 피한다.
+- 컴포넌트는 데이터 조회와 복잡한 변환을 직접 수행하지 않고 feature hook 또는 순수 모듈의 결과를 렌더링한다.
+
+### 3.10 패키지 관리와 의존성 원칙
+
+- 현재의 npm과 `package-lock.json`을 유지한다.
+- production 의존성은 React, React DOM, React Router, TanStack Query, `diff`, DOMPurify, `lucide-react`를 기본 목록으로 한다.
+- 개발 의존성은 TypeScript, Vite, React plugin, Vitest, `@testing-library/react`, `@testing-library/user-event`, `@testing-library/jest-dom`, MSW, Playwright, `@axe-core/playwright`, Biome을 기본 목록으로 한다.
+- 새 라이브러리는 표준 Web API나 작은 내부 모듈로 명확히 해결하기 어려울 때만 추가한다.
+- 완성형 UI kit, 코드 에디터, diff viewer, CSS framework, 범용 상태 관리 라이브러리는 사용하지 않는다.
+- 의존성을 추가할 때 번들 크기, 브라우저 지원, 유지보수 상태, 라이선스와 보안 영향을 확인한다.
+- production build에서 번들 크기를 기록하고 예상하지 못한 큰 증가를 검토한다.
+- 1차 기준으로 초기 JavaScript entry gzip 크기 200KB 이하를 목표로 한다. 초과하면 의존성 구성과 code splitting을 검토하며 기능 정확성을 희생해 수치만 맞추지 않는다.
+
+### 3.11 브라우저 표준 API 사용
+
+- 설정과 리뷰 입력은 React controlled form과 기본 HTML form validation을 사용하며 별도 form 라이브러리를 추가하지 않는다.
+- 날짜와 상대 시각 표시는 `Intl.DateTimeFormat`, `Intl.RelativeTimeFormat`을 사용한다.
+- locale 이름은 가능한 경우 `Intl.DisplayNames`를 사용하고 지원하지 않는 환경에는 locale 코드 자체를 표시한다.
+- 문자열 분할은 `Intl.Segmenter`를 우선 사용하고 명시적인 fallback을 둔다.
+- LTR/RTL 판정은 브라우저 locale 정보와 검증된 fallback 목록을 조합한다.
+- 파일 레이아웃 매칭은 두 내장 규칙에 맞춘 작은 parser로 구현하며 glob/정규식 라이브러리를 추가하지 않는다.
+- 요청 취소는 `AbortController`, 탭 복귀 감지는 Page Visibility API, 시스템 테마 감지는 `matchMedia`를 사용한다.
+
+## 4. 1차 출시 범위
+
+### 4.1 PR 불러오기와 탐색
 
 - GitHub PR URL을 파싱하고 유효성을 검사한다.
 - PR 정보, base/head 커밋, 변경 파일, 리뷰, 리뷰 댓글을 조회한다.
@@ -36,7 +173,7 @@
 - PR을 닫으면 빈 시작 화면으로 이동하고 탭에만 저장된 화면 상태를 삭제한다.
 - 유효한 GitHub 토큰과 PR 읽기 권한이 확인된 뒤에만 PR을 불러온다. 토큰이 없으면 PR URL을 입력하더라도 조회를 시작하지 않고 토큰 설정을 안내한다.
 
-### 3.2 번역 파일 감지
+### 4.2 번역 파일 감지
 
 - 기본 원문 locale은 `en`으로 설정한다.
 - 기본 번역 레이아웃은 locale 디렉터리형 `content/{locale}/**/*.md`로 설정한다.
@@ -55,7 +192,7 @@
 - 원문 locale은 대상 locale 필터에서 제외한다.
 - 일치하는 파일이 없으면 `No translation files found`와 현재 패턴을 보여주고 설정 수정 및 재시도 동작을 제공한다.
 
-### 3.3 선호 locale과 PR별 필터
+### 4.3 선호 locale과 PR별 필터
 
 - 자주 검토하는 locale 목록을 브라우저 설정에 저장하며 기본값은 `ko`로 한다.
 - PR을 열 때 PR에 존재하는 선호 locale을 자동 선택한다.
@@ -67,7 +204,7 @@
 - 현재 선택 상태는 해당 탭과 PR 세션에 저장한다.
 - 선택하지 않은 locale 파일이 있는 상태에서 Approve 또는 Request changes를 제출하면 리뷰 결정이 PR 전체에 적용된다는 경고를 표시한다.
 
-### 3.4 언어 및 문자 방향 지원
+### 4.4 언어 및 문자 방향 지원
 
 - 유효한 BCP 47 locale과 Unicode 텍스트를 특정 언어 allowlist로 제한하지 않는다.
 - 앱 UI, 파일 경로, 줄번호, diff 기호는 LTR을 유지한다.
@@ -78,7 +215,7 @@
 - 위 목록 밖의 locale도 차단하지 않으며 지원하지 않는 분할 기능은 기본 문자열/grapheme 비교로 fallback한다.
 - RTL 검증은 번역 정확성이 아니라 방향, 혼합 문자, 줄번호 및 diff UI 분리, 레이아웃 안정성을 대상으로 한다.
 
-### 3.5 파일 상태와 내용 조회
+### 4.5 파일 상태와 내용 조회
 
 다음 Markdown 파일 상태를 모두 지원한다.
 
@@ -115,7 +252,7 @@ GitHub patch 정보와 브라우저에서 계산한 라인 diff를 함께 사용
 - 100MB를 초과하거나 GitHub API가 제공하지 않는 파일은 지원 불가 상태로 표시한다.
 - PR을 열 때 모든 파일 내용을 선행 조회하지 않도록 조회 시점과 캐시 정책을 별도로 정의한다.
 
-### 3.6 3열 diff 뷰어
+### 4.6 3열 diff 뷰어
 
 - 변경 파일은 한 번에 하나만 표시한다. GitHub처럼 모든 파일을 세로로 이어 붙이지 않는다.
 - 좌측 파일 트리에서 파일을 선택하고 검색할 수 있게 하며 이전 파일과 다음 파일 이동을 제공한다.
@@ -146,7 +283,7 @@ GitHub patch 정보와 브라우저에서 계산한 라인 diff를 함께 사용
 - 문단 단위 자동 정렬은 구현하지 않는다.
 - 처음부터 가상화를 넣지 않고 실제 성능 문제가 확인될 때 추가한다.
 
-### 3.7 Viewed 상태
+### 4.7 Viewed 상태
 
 - Viewed 기능은 인증된 사용자에게만 제공한다.
 - GraphQL의 `viewerViewedState`로 현재 사용자의 실제 GitHub 상태를 조회한다.
@@ -155,7 +292,7 @@ GitHub patch 정보와 브라우저에서 계산한 라인 diff를 함께 사용
 - 파일이 다시 변경되면 GitHub가 Viewed를 해제하는 동작을 그대로 따른다.
 - 화면 진행률은 선택된 locale 파일만 계산하되 파일별 상태의 원본은 GitHub로 유지한다.
 
-### 3.8 기존 리뷰 대화
+### 4.8 기존 리뷰 대화
 
 - 기존 인라인 리뷰 댓글과 전체 리뷰 댓글을 표시한다.
 - 작성자, 아바타, 작성 시각, 본문, outdated 상태, GitHub 원문 링크를 제공한다.
@@ -166,7 +303,7 @@ GitHub patch 정보와 브라우저에서 계산한 라인 diff를 함께 사용
 - 외부 링크에는 안전한 `rel` 속성을 강제하고 이미지 URL은 CSP 허용 origin 정책을 따른다.
 - 조회 데이터에서 확인 가능한 경우 resolved 상태는 표시하되 Resolve/Unresolve 조작은 1차 버전에서 제외한다.
 
-### 3.9 댓글과 리뷰 작성
+### 4.9 댓글과 리뷰 작성
 
 - 자체 계산한 diff는 화면 표시에만 사용한다. 댓글 가능 라인은 GitHub가 제공한 patch hunk를 기준으로 판정한다.
 - 새 인라인 댓글은 deprecated되는 `position` 대신 `commit_id`(현재 head SHA), `path`, `line`, `side`를 사용한다. 여러 줄 댓글에는 `start_line`, `start_side`도 사용한다.
@@ -188,7 +325,7 @@ GitHub patch 정보와 브라우저에서 계산한 라인 diff를 함께 사용
 - 토큰은 필수다. 토큰이 없거나 유효하지 않으면 PR 조회와 모든 리뷰 기능을 사용할 수 없다.
 - 토큰은 유효하지만 저장소 쓰기 권한이 없는 경우에는 PR 조회와 비교만 허용하고 Viewed, 댓글, 답글, 리뷰 제출을 비활성화한다.
 
-### 3.10 새로고침과 초안 보호
+### 4.10 새로고침과 초안 보호
 
 - 수동 `Refresh`는 최신 GitHub 데이터를 즉시 불러와 반영한다.
 - 제출하지 않은 textarea 내용이 영향을 받을 수 있으면 수동 갱신 전에 경고한다.
@@ -199,9 +336,9 @@ GitHub patch 정보와 브라우저에서 계산한 라인 diff를 함께 사용
 - 갱신 후 가능한 초안은 새 diff의 유효한 위치에 다시 연결한다.
 - 연결할 라인이 사라진 초안은 `Unmapped draft` 영역에 보존하고 복사 및 삭제 기능을 제공한다.
 
-## 4. 인증과 브라우저 저장소
+## 5. 인증과 브라우저 저장소
 
-### 4.1 인증 방식
+### 5.1 인증 방식
 
 - Fine-grained PAT와 classic PAT를 모두 허용한다.
 - UI와 문서에서는 Fine-grained PAT를 권장한다.
@@ -216,7 +353,7 @@ GitHub patch 정보와 브라우저에서 계산한 라인 diff를 함께 사용
 - 검증에 성공하면 사용자 로그인명과 아바타, 저장소 접근 여부, 사용 가능한 리뷰 기능을 표시한다.
 - 유효한 토큰이지만 해당 저장소의 쓰기 권한이 부족하면 제한 이유를 표시하고 저장소 단위 읽기 전용으로 동작한다.
 
-### 4.2 토큰 저장 선택
+### 5.2 토큰 저장 선택
 
 - 기본값은 `sessionStorage`이며 같은 탭의 새로고침 동안만 토큰을 유지한다.
 - 사용자가 `Remember token on this device`를 명시적으로 선택하면 `localStorage`에 저장한다.
@@ -227,7 +364,7 @@ GitHub patch 정보와 브라우저에서 계산한 라인 diff를 함께 사용
 - 외부 분석 도구, 광고, 원격 스크립트, CDN JavaScript를 사용하지 않는다.
 - 토큰 입력란 주변에 `This app runs entirely in your browser` 안내와 공용 기기 저장 위험을 표시한다.
 
-### 4.3 기타 저장 정책
+### 5.3 기타 저장 정책
 
 `localStorage`에 저장할 항목:
 
@@ -249,7 +386,7 @@ GitHub patch 정보와 브라우저에서 계산한 라인 diff를 함께 사용
 
 기존 프로토타입을 실행한 브라우저에는 `locale-review-settings` 안에 토큰이 남아 있을 수 있다. 새 저장 구조를 처음 실행할 때 이 레거시 토큰 필드를 삭제하는 일회성 마이그레이션을 수행한다. 마이그레이션 중 토큰 값을 로그나 다른 저장소로 복사하지 않는다.
 
-## 5. GitHub API 설계
+## 6. GitHub API 설계
 
 REST와 GraphQL 세부 구현이 UI 컴포넌트에 노출되지 않도록 타입이 정의된 API 계층을 만든다.
 
@@ -275,7 +412,7 @@ GitHub 응답에 pagination이 있으면 모두 처리한다. PR이나 파일을
 
 API 계층은 base 저장소와 head 저장소를 별도 식별자로 유지해야 하며, 동일 저장소 PR이라고 가정하지 않는다. Compare API에서 얻은 merge base SHA, 현재 head SHA, GitHub patch를 하나의 PR diff 기준 정보로 묶어 하위 계층에 전달한다.
 
-## 6. 화면 구성
+## 7. 화면 구성
 
 ### 시작 화면
 
@@ -311,7 +448,7 @@ API 계층은 base 저장소와 head 저장소를 별도 식별자로 유지해�
 - 추가, 삭제, 경고를 색상으로만 구분하지 않는다.
 - `prefers-reduced-motion`을 존중한다.
 
-## 7. 구현 순서
+## 8. 구현 순서
 
 ### 공통 개발 워크플로
 
@@ -503,7 +640,7 @@ npm run build
 
 완료 조건: 지정 브랜치에 병합하면 검사와 정적 사이트 배포가 자동으로 완료된다.
 
-## 8. 테스트 전략
+## 9. 테스트 전략
 
 테스트는 로직 검증, UI 기능 검증, 실제 브라우저 검증의 세 계층으로 운영한다. 모든 기능 PR은 관련 단위/컴포넌트 테스트와 브라우저 흐름 테스트를 함께 추가하는 것을 원칙으로 한다.
 
@@ -581,7 +718,7 @@ mutation 테스트는 기본적으로 모두 mock API를 사용하며 임의의 
 - 반복되는 50ms 이상 long task 또는 지속적인 스크롤 저하가 확인되면 가상화나 Web Worker 도입 조건을 충족한 것으로 본다.
 - CI 환경 편차가 큰 절대 FPS만으로 빌드를 실패시키지 않고, 추세와 명백한 회귀를 기록한다.
 
-## 9. 보안 완료 조건
+## 10. 보안 완료 조건
 
 - 토큰이 저장소 파일, 빌드 결과, URL, 앱 로그, 분석 데이터, 화면 캡처, 오류 문구에 나타나지 않는다.
 - 토큰은 기본적으로 세션에만 저장하며 영구 저장에는 명시적인 동의를 받는다.
@@ -596,7 +733,7 @@ mutation 테스트는 기본적으로 모두 mock API를 사용하며 임의의 
 - 문서에서 저장소 제한, 짧은 만료 기간을 가진 Fine-grained PAT를 권장하고 classic PAT의 위험을 설명한다.
 - GitHub Pages는 HTTPS로 제공한다.
 
-## 10. 1차 버전에서 제외할 기능
+## 11. 1차 버전에서 제외할 기능
 
 - PR 목록 및 번역 PR 자동 필터링
 - GitHub Enterprise Server
@@ -609,8 +746,9 @@ mutation 테스트는 기본적으로 모두 mock API를 사용하며 임의의 
 - 성능 테스트 전의 대용량 파일 가상화
 - 플레이스홀더, 변수, 링크, Hugo shortcode의 자동 불일치 검사
 - 임의 정규식 기반의 범용 번역 경로 매핑 편집기
+- Markdown 원문 syntax highlighting
 
-## 11. 후속 로드맵
+## 12. 후속 로드맵
 
 1. 저장소별 PR 목록, 번역 파일 필터링, pagination
 2. 최소한의 신뢰 가능한 서버를 사용한 GitHub OAuth 또는 GitHub App
@@ -621,6 +759,6 @@ mutation 테스트는 기본적으로 모두 mock API를 사용하며 임의의 
 7. 준비된 메시지 구조를 활용한 앱 UI 다국어 지원
 8. 실제 사용자 요구가 확인될 경우 저장소별 규칙을 적용하는 비차단 번역 품질 경고
 
-## 12. 최종 완료 기준
+## 13. 최종 완료 기준
 
 사용자가 앱을 GitHub Pages에 배포하고, 유효한 GitHub 토큰을 설정한 뒤 `github.com` PR URL을 열어 번역 locale을 선택하고, Markdown 원문/변경 전/변경 후 전체 파일을 비교하며, 기존 리뷰 대화를 확인하고, Viewed를 표시하고, 즉시 댓글 또는 pending 댓글을 작성하고, GitHub 리뷰를 제출할 수 있어야 한다. 새로고침과 API 오류에서도 작성 내용이 안전하게 보존되고 Light/Dark 테마와 공식 검증 LTR/RTL locale이 동작해야 하며, 이 모든 기능은 별도 백엔드 없이 제공되어야 한다.
