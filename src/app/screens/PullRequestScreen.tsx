@@ -1,10 +1,16 @@
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
 import type { GitHubApiError } from "../../api/errors";
-import type { PullRequestSummary } from "../../api/types";
+import type { PullRequestRef, PullRequestSummary } from "../../api/types";
+import type { LoadedPullRequest as LoadedPullRequestData } from "../../features/pull/fetchPullRequest";
 import { useToken } from "../../features/auth/TokenContext";
+import { checkRepositoryAccess, hasCapability } from "../../features/auth/connection";
+import { draftKey, draftSlot } from "../../features/comments/draftStorage";
 import { TranslationFileBrowser } from "../../features/files/TranslationFileBrowser";
 import { parsePullRequestRouteParams } from "../../features/pull/parsePullRequestUrl";
+import { RefreshBanner } from "../../features/pull/RefreshBanner";
 import { usePullRequest } from "../../features/pull/usePullRequest";
 import { messages } from "../../messages/en";
 import { ROUTE_START } from "../routes";
@@ -75,10 +81,71 @@ export function PullRequestScreen() {
 
   if (!data) return null;
 
+  return <LoadedPullRequest ref={parsed.ref} data={data} onClose={close} />;
+}
+
+/**
+ * Everything that needs a loaded pull request.
+ *
+ * Split out so the hooks below run only once the reference and the diff base
+ * exist, rather than being conditionally enabled from the parent.
+ */
+function LoadedPullRequest({
+  ref,
+  data,
+  onClose,
+}: {
+  ref: PullRequestRef;
+  data: LoadedPullRequestData;
+  onClose: () => void;
+}) {
+  const { client, connection } = useToken();
+  const viewerLogin = connection?.state === "authenticated" ? connection.user.login : null;
+
+  // plan.md 4.9: every write surface follows the repository's real permission,
+  // not the presence of a token.
+  const access = useQuery({
+    queryKey: ["repository-access", ref.owner, ref.repository],
+    enabled: client !== null,
+    queryFn: ({ signal }) => {
+      if (!client) throw new Error("repository access ran without a client");
+      return checkRepositoryAccess(client, ref.owner, ref.repository, signal);
+    },
+  });
+
+  const canWrite = hasCapability(access.data ?? null, "review");
+
+  // plan.md 4.10 and 5.3: unsent text survives a reload of this tab.
+  const [slot] = useState(() => draftSlot(draftKey(ref.owner, ref.repository, ref.number)));
+  const [reviewBody, setReviewBody] = useState(() => slot.read().reviewBody);
+
+  useEffect(() => {
+    const stored = slot.read();
+    slot.write({ ...stored, reviewBody });
+  }, [slot, reviewBody]);
+
   return (
     <main>
-      <PullRequestHeader summary={data.summary} onClose={close} />
-      <TranslationFileBrowser pullRequestRef={parsed.ref} diffBase={data.diffBase} />
+      <PullRequestHeader summary={data.summary} onClose={onClose} />
+
+      {access.data?.state === "accessible" && !canWrite && (
+        <p role="status">{messages.pullRequest.readOnlyBody}</p>
+      )}
+
+      <RefreshBanner
+        pullRequestRef={ref}
+        current={{ headSha: data.summary.headSha, reviewMarker: "" }}
+        hasUnsentWork={reviewBody.trim() !== ""}
+      />
+
+      <TranslationFileBrowser
+        pullRequestRef={ref}
+        diffBase={data.diffBase}
+        canWrite={canWrite}
+        viewerLogin={viewerLogin}
+        reviewBody={reviewBody}
+        onReviewBodyChange={setReviewBody}
+      />
     </main>
   );
 }

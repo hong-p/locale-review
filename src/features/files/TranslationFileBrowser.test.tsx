@@ -43,7 +43,7 @@ function trackContents(): string[] {
   return requested;
 }
 
-function renderBrowser() {
+function renderBrowser(overrides: { canWrite?: boolean } = {}) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
@@ -51,7 +51,14 @@ function renderBrowser() {
   return render(
     <QueryClientProvider client={queryClient}>
       <TokenProvider>
-        <TranslationFileBrowser pullRequestRef={PR_REF} diffBase={DIFF_BASE} />
+        <TranslationFileBrowser
+          pullRequestRef={PR_REF}
+          diffBase={DIFF_BASE}
+          canWrite={overrides.canWrite ?? false}
+          viewerLogin="translator"
+          reviewBody=""
+          onReviewBodyChange={() => {}}
+        />
       </TokenProvider>
     </QueryClientProvider>,
   );

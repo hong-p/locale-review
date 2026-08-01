@@ -2,34 +2,50 @@ import { useMemo, useState } from "react";
 
 import type { PullRequestDiffBase, PullRequestRef } from "../../api/types";
 import { messages } from "../../messages/en";
+import { CommentThreadView } from "../comments/CommentThreadView";
+import { ReviewSummaryBox } from "../comments/ReviewSummaryBox";
+import { useCommentActions, useReviewComments } from "../comments/useReviewComments";
+import { threadsForFile } from "../comments/fetchReviewComments";
 import { ThreeColumnDiff } from "../diff/ThreeColumnDiff";
 import {
   filterFilesByLocale,
   hiddenFileCount,
   initialLocaleSelection,
   toggleLocale,
+  unreviewedLocales,
 } from "../locales/localeFilter";
 import { DEFAULT_LAYOUT } from "../settings/translationLayout";
 import { FileSidebar } from "./FileSidebar";
 import { buildTranslationFileModel } from "./translationFileModel";
 import type { FileContent } from "./fetchFileContent";
+import { ViewedToggle } from "../viewed/ViewedToggle";
+import { useViewedState } from "../viewed/useViewedState";
 import { useChangedFiles, useFileVersions } from "./useFileVersions";
 
 /**
- * Ties the changed-file list, the locale filter, and lazy content loading
- * together (plan.md 4.2, 4.3, 4.6).
- *
- * The three-column viewer itself is phase 3. What lands here is the selection
- * model it will render into, plus proof that content loads only for the
- * selected file.
+ * The review surface: file list, locale filter, three-column diff, Viewed,
+ * existing conversations, and review submission
+ * (plan.md 4.2, 4.3, 4.6, 4.7, 4.8, 4.9).
  */
 
 export type TranslationFileBrowserProps = {
   pullRequestRef: PullRequestRef;
   diffBase: PullRequestDiffBase;
+  /** Whether this token may write; every write surface follows it (plan.md 4.9). */
+  canWrite: boolean;
+  viewerLogin: string | null;
+  reviewBody: string;
+  onReviewBodyChange: (body: string) => void;
 };
 
-export function TranslationFileBrowser({ pullRequestRef, diffBase }: TranslationFileBrowserProps) {
+export function TranslationFileBrowser({
+  pullRequestRef,
+  diffBase,
+  canWrite,
+  viewerLogin,
+  reviewBody,
+  onReviewBodyChange,
+}: TranslationFileBrowserProps) {
   const changed = useChangedFiles(pullRequestRef);
 
   const model = useMemo(
@@ -59,11 +75,18 @@ export function TranslationFileBrowser({ pullRequestRef, diffBase }: Translation
     visibleFiles.find((file) => file.id === selectedFileId) ?? visibleFiles[0] ?? null;
 
   const versions = useFileVersions(selectedFile, diffBase);
+  const viewed = useViewedState(pullRequestRef, canWrite);
+  const conversations = useReviewComments(pullRequestRef);
+  const actions = useCommentActions(pullRequestRef, diffBase.headSha, viewerLogin, canWrite);
 
   // The patch stays on the raw changed file rather than the model, since only
   // the viewer and the comment layer need it.
   const selectedFilePatch =
     changed.data?.files.find((file) => file.path === selectedFile?.id)?.patch ?? null;
+
+  const fileThreads = selectedFile
+    ? threadsForFile(conversations.data?.threads ?? [], selectedFile.id)
+    : [];
 
   if (changed.isPending) return <p role="status">{messages.pullRequest.loading}</p>;
   if (!model) return null;
@@ -125,8 +148,42 @@ export function TranslationFileBrowser({ pullRequestRef, diffBase }: Translation
             />
           )}
           {!selectedFile.canComment && <p>{messages.files.noPatch}</p>}
+
+          <ViewedToggle
+            path={selectedFile.id}
+            controller={viewed}
+            visiblePaths={visibleFiles.map((file) => file.id)}
+          />
+
+          <section aria-label={messages.comments.heading}>
+            <h3>{messages.comments.heading}</h3>
+            {fileThreads.length === 0 ? (
+              <p>{messages.comments.none}</p>
+            ) : (
+              fileThreads.map((thread) => (
+                <CommentThreadView
+                  key={thread.rootId}
+                  thread={thread}
+                  canReply={canWrite}
+                  isBusy={actions.isBusy}
+                  onReply={actions.reply}
+                />
+              ))
+            )}
+          </section>
         </article>
       )}
+
+      <ReviewSummaryBox
+        canSubmit={canWrite}
+        isBusy={actions.isBusy}
+        // plan.md 4.3: a verdict covers locales the filter is hiding too.
+        unreviewedLocales={unreviewedLocales(model.locales, locales)}
+        pendingCommentCount={0}
+        body={reviewBody}
+        onBodyChange={onReviewBodyChange}
+        onSubmit={actions.submit}
+      />
     </section>
   );
 }
