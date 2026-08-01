@@ -31,6 +31,15 @@ npx playwright install --with-deps chromium firefox webkit
 | 컴포넌트 | Vitest + Testing Library | `src/**/*.test.tsx` | 상태별 화면 동작, 접근성 이름, 테마 |
 | 브라우저 | Playwright | `e2e/*.spec.ts` | 실제 정적 빌드에서의 사용자 흐름 |
 
+브라우저 테스트는 앱에 목 코드를 넣지 않는다. `e2e/support/github.ts`가 Playwright의 `page.route`로 GitHub API를 네트워크 계층에서 가로채므로, **배포되는 것과 동일한 번들**이 실행된다.
+
+jsdom이 답할 수 없는 것이 브라우저 테스트의 존재 이유다.
+
+- 3열 그리드가 실제로 3열인지 (bounding box 비교)
+- 비율 기반 스크롤 동기화 — jsdom은 `scrollHeight`를 항상 0으로 보고한다
+- 900px 미디어 쿼리에 따른 패널 전환
+- RTL에서 줄번호가 왼쪽에 남는지
+
 ## GitHub API 모킹
 
 모든 GitHub 요청은 MSW로 가로챈다. 공유 서버는 `src/test/msw/server.ts`에 있고 기본 핸들러는 `src/test/msw/handlers.ts`에 둔다.
