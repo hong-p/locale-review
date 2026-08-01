@@ -18,6 +18,15 @@ export function TokenPanel() {
     useToken();
   const [draft, setDraft] = useState("");
   const [isTesting, setIsTesting] = useState(false);
+  /**
+   * Result of an explicit Test connection press.
+   *
+   * The app resolves the account on its own as soon as a token exists, so the
+   * signed-in line is already on screen before the button is touched. Without
+   * a separate record of the press, clicking produced no visible change and
+   * gave no answer to the question the button asks.
+   */
+  const [tested, setTested] = useState<"ok" | "failed" | null>(null);
   const fieldId = useId();
   const rememberId = useId();
 
@@ -26,13 +35,17 @@ export function TokenPanel() {
     if (draft.trim() === "") return;
     setToken(draft, mode);
     setDraft("");
+    setTested(null);
   };
 
   const onTest = async () => {
     if (!client) return;
     setIsTesting(true);
+    setTested(null);
     try {
-      setConnection(await testConnection(client));
+      const result = await testConnection(client);
+      setConnection(result);
+      setTested(result.state === "authenticated" ? "ok" : "failed");
     } finally {
       setIsTesting(false);
     }
@@ -98,6 +111,16 @@ export function TokenPanel() {
           {messages.token.signedInAs} {connection.user.login}
         </p>
       )}
+
+      {/* The answer to the button, stated as a result rather than left to be
+          inferred from a line that was already there. */}
+      {tested === "ok" && connection?.state === "authenticated" && (
+        <p role="status">
+          {messages.token.testPassed} {connection.user.login}. {messages.token.repositoryScope}
+        </p>
+      )}
+      {/* A rejected token is worth reporting whether or not the button was
+          pressed, since the automatic check finds it first. */}
       {connection?.state === "invalid-token" && (
         <p role="alert">
           {messages.token.connectionFailed} {connection.error.message}

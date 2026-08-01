@@ -31,6 +31,9 @@ export const messages = {
       "A fine-grained token limited to the repositories you review, with Contents read-only, Pull requests read and write, and a short expiry.",
     createLink: "Create a fine-grained token on GitHub",
     signedInAs: "Signed in as",
+    testPassed: "Connection verified. GitHub accepted this token for",
+    repositoryScope:
+      "Whether it can read or write a particular repository is reported when you open a pull request there.",
     connectionFailed: "That token could not be used.",
     notSet: "No token set",
   },

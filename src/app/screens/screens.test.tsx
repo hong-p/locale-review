@@ -149,15 +149,31 @@ describe("token panel", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(/could not be used/i);
   });
 
-  it("shows the authenticated login after a successful test", async () => {
+  it("shows the authenticated login without waiting for a button press", async () => {
+    // The app resolves the account as soon as a token exists, because the
+    // review flow needs the login (plan.md 4.9).
+    seedToken();
+    server.use(http.get(`${ORIGIN}/user`, () => HttpResponse.json({ login: "translator" })));
+
+    renderApp(ROUTE_START);
+
+    expect(await screen.findByText(/signed in as/i)).toHaveTextContent("translator");
+  });
+
+  it("answers the Test connection button with an explicit result", async () => {
+    // The signed-in line is already on screen, so without its own result the
+    // button appeared to do nothing at all.
     const user = userEvent.setup();
     seedToken();
     server.use(http.get(`${ORIGIN}/user`, () => HttpResponse.json({ login: "translator" })));
 
     renderApp(ROUTE_START);
+    await screen.findByText(/signed in as/i);
+    expect(screen.queryByText(/connection verified/i)).toBeNull();
+
     await user.click(screen.getByRole("button", { name: /test connection/i }));
 
-    expect(await screen.findByText(/signed in as/i)).toHaveTextContent("translator");
+    expect(await screen.findByText(/connection verified/i)).toHaveTextContent("translator");
   });
 
   it("offers no test or clear action when no token is set", () => {
