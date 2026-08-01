@@ -224,7 +224,10 @@ describe("PullRequestScreen", () => {
 
   const failures = [
     { status: 404, pattern: /not found/i },
-    { status: 403, pattern: /access denied/i },
+    // 401 and 403 must not read the same: one says fix the token, the other
+    // says the token is fine but cannot reach this repository.
+    { status: 401, pattern: /token was rejected/i },
+    { status: 403, pattern: /cannot see that repository/i },
     { status: 500, pattern: /unexpected response/i },
   ];
 
