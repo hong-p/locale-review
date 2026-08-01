@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router";
 import type { GitHubApiError } from "../../api/errors";
 import type { PullRequestSummary } from "../../api/types";
 import { useToken } from "../../features/auth/TokenContext";
+import { TranslationFileBrowser } from "../../features/files/TranslationFileBrowser";
 import { parsePullRequestRouteParams } from "../../features/pull/parsePullRequestUrl";
 import { usePullRequest } from "../../features/pull/usePullRequest";
 import { messages } from "../../messages/en";
@@ -77,6 +78,7 @@ export function PullRequestScreen() {
   return (
     <main>
       <PullRequestHeader summary={data.summary} onClose={close} />
+      <TranslationFileBrowser pullRequestRef={parsed.ref} diffBase={data.diffBase} />
     </main>
   );
 }
