@@ -69,6 +69,9 @@ export const messages = {
     noTranslationsBody:
       "None of the changed files match the active translation layout. Adjust the layout in settings and try again.",
     activeLayout: "Active layout",
+    activeSource: "Source locale",
+    changeLayout: "Change the layout in settings",
+    retry: "Try again",
     chooseLocale: "This pull request contains no preferred locale. Choose which to review.",
     truncated: "GitHub returned only the first 3,000 changed files, so this list is incomplete.",
     ambiguous: "These paths match more than one layout rule and need a choice:",
@@ -197,10 +200,41 @@ export const messages = {
   },
   settings: {
     title: "Settings",
+    open: "Settings",
+    intro:
+      "These rules decide which changed files are translations, and where the app looks for the source file each one was translated from.",
     theme: "Theme",
     themeLight: "Light",
     themeDark: "Dark",
     themeSystem: "System",
+    layoutHeading: "Translation layout",
+    layoutLegend: "Layouts to detect",
+    layoutLocaleDirectory: "Locale directory — content/{locale}/guide.md",
+    layoutFilenameSuffix: "Filename suffix — content/guide.{locale}.md",
+    layoutHint: "Both can be on at once. A path matching both is reported instead of guessed.",
+    sourceLocaleLabel: "Source locale",
+    sourceLocaleHint:
+      "The language translations are made from. Its files are shown as the source, never as a translation to review.",
+    contentRootLabel: "Content root",
+    contentRootHint:
+      "The directory translations live under, for example content. Leave it empty to search the whole repository.",
+    contentRootPlaceholder: "content",
+    extensionsLabel: "File extensions",
+    extensionsHint: "Comma separated. A missing dot is added for you.",
+    extensionsPlaceholder: ".md, .mdx",
+    sourceSuffixLabel: "Source files carry the locale suffix",
+    sourceSuffixHint:
+      "Turn this off for Hugo's default language, where guide.ko.md pairs with guide.md rather than guide.en.md.",
+    preferredLabel: "Preferred locales",
+    preferredHint:
+      "Selected automatically when a pull request contains them, and treated as locales even if they do not look like a language tag. Comma separated.",
+    preferredPlaceholder: "ko",
+    exampleHeading: "Where the source is looked up",
+    exampleNone: "These settings do not match the path they describe.",
+    save: "Save settings",
+    saved: "Settings saved.",
+    reset: "Reset to defaults",
+    resetDone: "Settings restored to their defaults.",
   },
   errors: {
     unexpectedTitle: "Something went wrong",

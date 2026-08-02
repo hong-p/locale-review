@@ -7,9 +7,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TokenProvider } from "../../features/auth/TokenContext";
 import { ThemeProvider } from "../../features/settings/theme";
+import { TranslationSettingsProvider } from "../../features/settings/TranslationSettingsContext";
 import { server } from "../../test/msw/server";
-import { ROUTE_PULL_REQUEST, ROUTE_START } from "../routes";
+import { ROUTE_PULL_REQUEST, ROUTE_SETTINGS, ROUTE_START } from "../routes";
 import { PullRequestScreen } from "./PullRequestScreen";
+import { SettingsScreen } from "./SettingsScreen";
 import { StartScreen } from "./StartScreen";
 
 const ORIGIN = "https://api.github.com";
@@ -28,14 +30,17 @@ function renderApp(initialPath: string) {
   return render(
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <TokenProvider>
-          <MemoryRouter initialEntries={[initialPath]}>
-            <Routes>
-              <Route path={ROUTE_START} element={<StartScreen />} />
-              <Route path={ROUTE_PULL_REQUEST} element={<PullRequestScreen />} />
-            </Routes>
-          </MemoryRouter>
-        </TokenProvider>
+        <TranslationSettingsProvider>
+          <TokenProvider>
+            <MemoryRouter initialEntries={[initialPath]}>
+              <Routes>
+                <Route path={ROUTE_START} element={<StartScreen />} />
+                <Route path={ROUTE_SETTINGS} element={<SettingsScreen />} />
+                <Route path={ROUTE_PULL_REQUEST} element={<PullRequestScreen />} />
+              </Routes>
+            </MemoryRouter>
+          </TokenProvider>
+        </TranslationSettingsProvider>
       </ThemeProvider>
     </QueryClientProvider>,
   );
