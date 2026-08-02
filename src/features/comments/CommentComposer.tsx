@@ -56,11 +56,16 @@ export function CommentComposer({
         void send(false);
       }}
     >
-      <label htmlFor={fieldId} className={styles.label}>
-        {startLine === undefined
-          ? `${messages.comments.newOnLine} ${line}`
-          : `${messages.comments.newOnLines} ${startLine}–${line}`}
-      </label>
+      <div className={styles.heading}>
+        <label htmlFor={fieldId} className={styles.label}>
+          {startLine === undefined
+            ? `${messages.comments.newOnLine} ${line}`
+            : `${messages.comments.newOnLines} ${startLine}–${line}`}
+        </label>
+        {/* Shift-click was only ever a tooltip, so it was invisible to touch
+            and to anyone not hunting for it. */}
+        <span className={styles.hint}>{messages.comments.shiftToExtend}</span>
+      </div>
       <MarkdownToolbar textarea={textarea} value={body} onChange={setBody} disabled={isBusy} />
       <textarea
         id={fieldId}

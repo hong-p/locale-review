@@ -703,3 +703,15 @@ test("a comment row stays the width of the panel beside a long line", async ({ p
   expect((editor?.width ?? 0) / (panel?.width ?? 1)).toBeLessThan(1);
   expect((editor?.width ?? 0) / (panel?.width ?? 1)).toBeGreaterThan(0.85);
 });
+
+test("says how to select a range, on screen rather than in a tooltip", async ({ page }) => {
+  // The range feature worked but nothing visible mentioned it, so it may as
+  // well not have existed — and a title attribute says nothing on touch.
+  await mockGitHub(page);
+  await openPullRequest(page);
+
+  const after = page.getByRole("region", { name: "After", exact: true });
+  await after.getByRole("button", { name: /add a comment on line 60/i }).click();
+
+  await expect(page.getByText(/shift-click another \+ to cover a range/i)).toBeVisible();
+});

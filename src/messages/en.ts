@@ -124,7 +124,7 @@ export const messages = {
     addOnLine: "Add a comment on line",
     newOnLine: "New comment on line",
     newOnLines: "New comment on lines",
-    shiftToExtend: "Shift-click another line to comment on a range",
+    shiftToExtend: "Shift-click another + to cover a range of lines",
     postNow: "Comment now",
     addToReview: "Add to review",
     cancel: "Cancel",
