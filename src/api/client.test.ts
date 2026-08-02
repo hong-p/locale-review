@@ -435,3 +435,19 @@ describe("GraphQL error classification", () => {
     expect(JSON.stringify(error)).not.toContain(TOKEN);
   });
 });
+
+describe("HTTP caching", () => {
+  it("revalidates instead of reusing the browser's copy", async () => {
+    // GitHub marks most reads cacheable for a minute, which made a refetch
+    // right after a write return the state from before it.
+    let seen: RequestInit | undefined;
+    const fetchImpl: typeof fetch = async (_url, init) => {
+      seen = init;
+      return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
+    };
+
+    await createGitHubClient({ token: TOKEN, fetchImpl }).requestJson("/user", isRecord);
+
+    expect(seen?.cache).toBe("no-cache");
+  });
+});

@@ -552,3 +552,48 @@ test("refresh reports that it ran", async ({ page }) => {
 
   await expect.poll(() => refetched).toBeGreaterThan(0);
 });
+
+test("panels take the height the window offers", async ({ page }) => {
+  // A 60vh cap left half a large screen unused, which is the opposite of what
+  // a three-column reader needs.
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await mockGitHub(page);
+  await openPullRequest(page);
+
+  const panel = await page.getByRole("region", { name: "After", exact: true }).boundingBox();
+  expect((panel?.height ?? 0) / 1000).toBeGreaterThan(0.6);
+
+  // And the page itself does not scroll; the panel does.
+  const pageOverflow = await page.evaluate(() => document.body.scrollHeight - window.innerHeight);
+  expect(pageOverflow).toBeLessThanOrEqual(1);
+});
+
+test("shows the overall conversation beside the review form", async ({ page }) => {
+  // plan.md 4.8: these were fetched and never rendered anywhere.
+  await mockGitHub(page);
+  await page.route(
+    "https://api.github.com/repos/example-org/docs-site/issues/7/comments**",
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            id: 5,
+            user: { login: "maintainer", avatar_url: null, html_url: null },
+            created_at: "2026-01-01T00:00:00Z",
+            body: "전반적으로 좋습니다",
+            body_html: "<p>전반적으로 좋습니다</p>",
+            html_url: "https://github.com/example-org/docs-site/pull/7#issuecomment-5",
+          },
+        ]),
+      }),
+  );
+  await openPullRequest(page);
+
+  await page.getByRole("button", { name: /^review changes$/i }).click();
+
+  const conversation = page.getByRole("region", { name: /overall comments/i });
+  await expect(conversation).toContainText("maintainer");
+  await expect(conversation).toContainText("전반적으로 좋습니다");
+});

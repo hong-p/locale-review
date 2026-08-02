@@ -30,11 +30,12 @@
   padding: var(--space-2) var(--space-4) 0;
 }
 
+/* The file header stays put; the diff below it takes the rest of the height. */
 .scrollArea {
   display: flex;
   flex-direction: column;
+  flex: 1;
   min-height: 0;
-  overflow-y: auto;
 }
 
 /*
@@ -42,6 +43,8 @@
  * area scrolls rather than squeezing the panels to a few lines.
  */
 .diffArea {
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-height: 320px;
   padding: var(--space-3) var(--space-4) var(--space-4);

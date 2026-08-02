@@ -15,7 +15,7 @@ import { RefreshBanner } from "../../features/pull/RefreshBanner";
 import { usePullRequest } from "../../features/pull/usePullRequest";
 import { messages } from "../../messages/en";
 import { ReviewPopover } from "../../features/comments/ReviewPopover";
-import { useCommentActions } from "../../features/comments/useReviewComments";
+import { useCommentActions, useReviewComments } from "../../features/comments/useReviewComments";
 import shell from "../AppShell.module.css";
 import { ROUTE_START } from "../routes";
 
@@ -139,6 +139,7 @@ function LoadedPullRequest({
   // header, so both surfaces need the same actions and neither should hand
   // functions to the other.
   const actions = useCommentActions(ref, data.summary.headSha, viewerLogin, canWrite);
+  const conversations = useReviewComments(ref);
 
   return (
     <div className={shell.shell}>
@@ -170,6 +171,7 @@ function LoadedPullRequest({
       <ReviewPopover
         open={reviewOpen}
         onClose={() => setReviewOpen(false)}
+        issueComments={conversations.data?.issueComments ?? []}
         canSubmit={canWrite}
         isBusy={actions.isBusy}
         unreviewedLocales={unreviewed}

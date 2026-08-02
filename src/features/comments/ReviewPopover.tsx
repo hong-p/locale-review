@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 
 import { messages } from "../../messages/en";
+import type { IssueComment } from "./fetchReviewComments";
+import { sanitizeCommentHtml } from "./sanitizeCommentHtml";
 import { ReviewSummaryBox, type ReviewSummaryBoxProps } from "./ReviewSummaryBox";
 import styles from "./ReviewPopover.module.css";
 
@@ -15,9 +17,11 @@ import styles from "./ReviewPopover.module.css";
 export type ReviewPopoverProps = ReviewSummaryBoxProps & {
   open: boolean;
   onClose: () => void;
+  /** The pull request's overall conversation (plan.md 4.8). */
+  issueComments: readonly IssueComment[];
 };
 
-export function ReviewPopover({ open, onClose, ...summary }: ReviewPopoverProps) {
+export function ReviewPopover({ open, onClose, issueComments, ...summary }: ReviewPopoverProps) {
   const dialog = useRef<HTMLDialogElement | null>(null);
 
   useEffect(() => {
@@ -49,6 +53,33 @@ export function ReviewPopover({ open, onClose, ...summary }: ReviewPopoverProps)
             ×
           </button>
         </header>
+
+        {/* plan.md 4.8: overall comments were being fetched and never shown.
+            They belong beside the form where the next one is written. */}
+        {issueComments.length > 0 && (
+          <section className={styles.conversation} aria-label={messages.comments.overallHeading}>
+            <h3 className={styles.subheading}>{messages.comments.overallHeading}</h3>
+            <ol className={styles.list}>
+              {issueComments.map((comment) => (
+                <li key={comment.id} className={styles.comment}>
+                  <header className={styles.commentHeader}>
+                    <span className={styles.author}>
+                      {comment.author?.login ?? messages.pullRequest.authorUnknown}
+                    </span>
+                    <a href={comment.htmlUrl} target="_blank" rel="noreferrer noopener">
+                      {messages.comments.viewOnGitHub}
+                    </a>
+                  </header>
+                  <div
+                    // Same audited path as every other rendered comment body.
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: sanitised through the path plan.md 4.8 requires.
+                    dangerouslySetInnerHTML={{ __html: sanitizeCommentHtml(comment.bodyHtml) }}
+                  />
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
 
         <ReviewSummaryBox {...summary} />
       </div>

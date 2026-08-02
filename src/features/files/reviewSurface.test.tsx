@@ -99,6 +99,7 @@ function Surface({ canWrite }: { canWrite: boolean }) {
       <ReviewPopover
         open
         onClose={() => {}}
+        issueComments={[]}
         canSubmit={canWrite}
         isBusy={false}
         unreviewedLocales={unreviewed}
@@ -323,5 +324,44 @@ describe("review submission", () => {
     expect(screen.getByLabelText(/review summary/i)).toBeDisabled();
     expect(screen.getByRole("radio", { name: /^approve$/i })).toBeDisabled();
     expect(screen.getByRole("checkbox", { name: /^viewed$/i })).toBeDisabled();
+  });
+});
+
+describe("a reply appearing after it is sent", () => {
+  it("shows the reply in the thread without a manual reload", async () => {
+    const user = userEvent.setup();
+    let posted = false;
+
+    server.use(
+      http.get(`${REPO}/pulls/7/comments`, () =>
+        HttpResponse.json(
+          posted
+            ? [
+                REVIEW_COMMENT,
+                {
+                  ...REVIEW_COMMENT,
+                  id: 102,
+                  in_reply_to_id: 101,
+                  created_at: "2026-01-02T00:00:00Z",
+                  body: "동의합니다",
+                  body_html: "<p>동의합니다</p>",
+                },
+              ]
+            : [REVIEW_COMMENT],
+        ),
+      ),
+      http.post(`${REPO}/pulls/7/comments/101/replies`, () => {
+        posted = true;
+        return HttpResponse.json({ id: 102 });
+      }),
+    );
+
+    renderSurface(true);
+    await user.type(await screen.findByLabelText(/^reply$/i), "동의합니다");
+    await user.click(screen.getByRole("button", { name: /send reply/i }));
+
+    // The thread must pick the reply up on its own; asking the reviewer to
+    // reload to see their own reply is not an acceptable outcome.
+    expect(await screen.findByText("동의합니다")).toBeVisible();
   });
 });

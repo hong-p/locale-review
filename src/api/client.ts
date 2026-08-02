@@ -129,6 +129,13 @@ export function createGitHubClient(options: GitHubClientOptions) {
         // credentials would be pointless and widens what the request carries.
         credentials: "omit",
         redirect: "follow",
+        // GitHub returns `Cache-Control: private, max-age=60` on most REST
+        // reads, so a refetch straight after a write was being served the
+        // browser's copy from before it — a reply would post and then not
+        // appear for a minute. "no-cache" still revalidates rather than
+        // refetching blind, and GitHub does not charge a 304 against the rate
+        // limit, so the conditional request stays free.
+        cache: "no-cache",
       });
     } catch (error) {
       // An abort is the caller's own doing and must stay distinguishable from

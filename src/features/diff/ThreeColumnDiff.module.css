@@ -1,6 +1,9 @@
+/* Fills the diff area so the panels get the height rather than the page. */
 .viewer {
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  height: 100%;
   gap: var(--space-3);
 }
 
@@ -33,10 +36,12 @@
 
 .grid {
   display: grid;
+  min-height: 0;
   gap: var(--space-3);
   /* The column count follows how many panels are visible; the custom property
      is the one runtime value plan.md 3.7 allows through inline style. */
   grid-template-columns: repeat(var(--visible-panels, 3), minmax(0, 1fr));
+  flex: 1;
 }
 
 /*
@@ -67,4 +72,21 @@
   margin: 0;
   color: var(--color-fg-muted);
   font-size: var(--font-size-sm);
+}
+
+/* Each panel's slot in the grid. Flex so the panel stretches to the row. */
+.panelSlot {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+
+/*
+ * Declared after .panelSlot and with both classes, so hiding a panel on a
+ * narrow screen wins over the slot's own display.
+ */
+@media (max-width: 900px) {
+  .panelSlot.wideOnly {
+    display: none;
+  }
 }

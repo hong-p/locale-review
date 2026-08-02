@@ -2,6 +2,11 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  /* Fills its slot in both directions: the height so the scroller inside is
+     bounded and can scroll, the width so hiding a column widens the rest. */
+  flex: 1;
+  height: 100%;
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-2);
   background-color: var(--color-canvas);
@@ -24,12 +29,15 @@
   color: var(--color-fg);
 }
 
+/*
+ * The panel fills its grid track and scrolls inside itself. There is no height
+ * cap: the shell already bounds the diff area, and a 60vh cap left half of a
+ * large screen unused.
+ */
 .scroller {
   flex: 1;
+  min-height: 0;
   overflow: auto;
-  /* The panels sit in a grid track; a fixed height keeps all three aligned
-     and gives the proportional sync something to measure. */
-  max-height: 60vh;
 }
 
 /*

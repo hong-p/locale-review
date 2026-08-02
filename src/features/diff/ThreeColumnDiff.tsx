@@ -260,7 +260,7 @@ export function ThreeColumnDiff({
         {PANEL_ORDER.filter((key) => visible[key]).map((key) => (
           <div
             key={key}
-            className={shownOnNarrow === key ? undefined : styles.wideOnly}
+            className={`${styles.panelSlot} ${shownOnNarrow === key ? "" : styles.wideOnly}`}
             data-panel={key}
           >
             <DiffPanel
