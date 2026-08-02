@@ -1,4 +1,4 @@
-import { type RefObject, useMemo, useState } from "react";
+import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { messages } from "../../messages/en";
 import { CommentComposer } from "../comments/CommentComposer";
@@ -71,14 +71,53 @@ export function DiffPanel({
    * it, which is how GitHub's drag selection behaves without needing a drag.
    */
   const [range, setRange] = useState<{ start: number; end: number } | null>(null);
+  /**
+   * Set while the pointer is down on the gutter, as in GitHub's drag select.
+   *
+   * Kept in a ref as well as state: a pointer move fires before React has
+   * re-rendered with the new state, so the handler would read the previous
+   * value and the first line of a drag would be lost.
+   */
+  const [dragging, setDragging] = useState(false);
+  const draggingRef = useRef(false);
 
-  const onAdd = (line: number, extend: boolean) => {
+  const setDrag = useCallback((value: boolean) => {
+    draggingRef.current = value;
+    setDragging(value);
+  }, []);
+
+  const extendTo = (line: number) => {
     setRange((current) =>
-      extend && current !== null
-        ? { start: Math.min(current.start, line), end: Math.max(current.end, line) }
-        : { start: line, end: line },
+      current === null
+        ? { start: line, end: line }
+        : { start: Math.min(current.start, line), end: Math.max(current.end, line) },
     );
   };
+
+  const onAdd = (line: number, extend: boolean) => {
+    // Shift-click keeps the range reachable without a pointer, which a drag is
+    // not: it needs a mouse and says nothing to a keyboard or a screen reader.
+    if (extend) extendTo(line);
+    else setRange({ start: line, end: line });
+  };
+
+  const onDragStart = (line: number) => {
+    setRange({ start: line, end: line });
+    setDrag(true);
+  };
+
+  // The pointer is very often released outside the line it started on, so the
+  // end of a drag is listened for on the document rather than on a row.
+  useEffect(() => {
+    if (!dragging) return;
+    const stop = () => setDrag(false);
+    document.addEventListener("pointerup", stop);
+    document.addEventListener("pointercancel", stop);
+    return () => {
+      document.removeEventListener("pointerup", stop);
+      document.removeEventListener("pointercancel", stop);
+    };
+  }, [dragging, setDrag]);
   // plan.md 4.4: only the translation body follows the locale's direction;
   // numbers, markers, and chrome stay left-to-right.
   const dir = isRtlLocale(locale) ? "rtl" : "ltr";
@@ -113,7 +152,11 @@ export function DiffPanel({
                 searchTerm={searchTerm}
                 comments={comments}
                 range={range}
+                dragging={dragging}
+                draggingRef={draggingRef}
                 onAdd={onAdd}
+                onDragStart={onDragStart}
+                onDragOver={extendTo}
                 onCancel={() => setRange(null)}
               />
             ))}
@@ -132,7 +175,11 @@ function PanelLine({
   searchTerm,
   comments,
   range,
+  dragging,
+  draggingRef,
   onAdd,
+  onDragStart,
+  onDragOver,
   onCancel,
 }: {
   row: PanelRow;
@@ -142,7 +189,11 @@ function PanelLine({
   searchTerm: string;
   comments?: CommentCapabilities;
   range: { start: number; end: number } | null;
+  dragging: boolean;
+  draggingRef: RefObject<boolean>;
   onAdd: (line: number, extend: boolean) => void;
+  onDragStart: (line: number) => void;
+  onDragOver: (line: number) => void;
   onCancel: () => void;
 }) {
   const { line } = row;
@@ -176,6 +227,11 @@ function PanelLine({
           inRange ? styles.selected : ""
         }`}
         data-change={change}
+        // Extending as the pointer passes a line, but only over a line GitHub
+        // would accept, so a drag cannot build an unpostable range.
+        onPointerEnter={() => {
+          if (draggingRef.current && row.canComment && number !== null) onDragOver(number);
+        }}
       >
         <span className={styles.number}>{number ?? ""}</span>
         <span className={styles.marker} aria-hidden="true">
@@ -188,6 +244,12 @@ function PanelLine({
             type="button"
             className={inRange ? styles.addCommentActive : styles.addComment}
             onClick={(event) => onAdd(number ?? 0, event.shiftKey)}
+            // Starting on pointer down is what makes the drag feel like
+            // GitHub's; the click above still fires for a plain press.
+            onPointerDown={(event) => {
+              if (event.button !== 0 || event.shiftKey) return;
+              onDragStart(number ?? 0);
+            }}
             aria-label={`${messages.comments.addOnLine} ${number ?? ""}`}
             aria-pressed={inRange}
             title={messages.comments.shiftToExtend}
@@ -218,7 +280,7 @@ function PanelLine({
 
       {/* The composer sits at the end of the range, so a multi-line selection
           reads downward into the box the way GitHub's does. */}
-      {isRangeEnd && comments?.onCreate && range !== null && (
+      {isRangeEnd && !dragging && comments?.onCreate && range !== null && (
         <div className={styles.threadRow}>
           <div className={styles.threadCell}>
             <CommentComposer

@@ -14,6 +14,7 @@ import { OpenPullRequestField } from "../../features/pull/OpenPullRequestField";
 import { RefreshBanner } from "../../features/pull/RefreshBanner";
 import { usePullRequest } from "../../features/pull/usePullRequest";
 import { messages } from "../../messages/en";
+import { ConversationPopover } from "../../features/comments/ConversationPopover";
 import { ReviewPopover } from "../../features/comments/ReviewPopover";
 import { useCommentActions, useReviewComments } from "../../features/comments/useReviewComments";
 import shell from "../AppShell.module.css";
@@ -129,6 +130,7 @@ function LoadedPullRequest({
   }, [slot, reviewBody]);
 
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [conversationOpen, setConversationOpen] = useState(false);
   /**
    * Locales the filter is hiding, reported upward by the browser so the review
    * form in the header can warn about them (plan.md 4.3).
@@ -147,6 +149,11 @@ function LoadedPullRequest({
         summary={data.summary}
         onClose={onClose}
         onOpenReview={() => setReviewOpen(true)}
+        onOpenConversation={() => setConversationOpen(true)}
+        conversationCount={
+          (conversations.data?.issueComments.length ?? 0) +
+          (conversations.data?.reviews.length ?? 0)
+        }
         refresh={
           <RefreshBanner
             pullRequestRef={ref}
@@ -168,11 +175,16 @@ function LoadedPullRequest({
         onLocaleScopeChange={setUnreviewed}
       />
 
+      <ConversationPopover
+        open={conversationOpen}
+        onClose={() => setConversationOpen(false)}
+        issueComments={conversations.data?.issueComments ?? []}
+        reviews={conversations.data?.reviews ?? []}
+      />
+
       <ReviewPopover
         open={reviewOpen}
         onClose={() => setReviewOpen(false)}
-        issueComments={conversations.data?.issueComments ?? []}
-        reviews={conversations.data?.reviews ?? []}
         canSubmit={canWrite}
         isBusy={actions.isBusy}
         unreviewedLocales={unreviewed}
@@ -194,11 +206,16 @@ function PullRequestHeader({
   summary,
   onClose,
   onOpenReview,
+  onOpenConversation,
+  conversationCount,
   refresh,
 }: {
   summary: PullRequestSummary;
   onClose: () => void;
   onOpenReview: () => void;
+  onOpenConversation: () => void;
+  /** Shown on the button, so the reviewer knows there is something to read. */
+  conversationCount: number;
   refresh: React.ReactNode;
 }) {
   return (
@@ -226,6 +243,10 @@ function PullRequestHeader({
         <a href={summary.htmlUrl} target="_blank" rel="noreferrer noopener">
           {messages.pullRequest.openOnGitHub}
         </a>
+        <button type="button" onClick={onOpenConversation}>
+          {messages.comments.openConversation}
+          {conversationCount > 0 && ` (${conversationCount})`}
+        </button>
         <button type="button" onClick={onOpenReview}>
           {messages.review.open}
         </button>

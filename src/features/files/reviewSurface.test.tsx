@@ -99,8 +99,6 @@ function Surface({ canWrite }: { canWrite: boolean }) {
       <ReviewPopover
         open
         onClose={() => {}}
-        issueComments={[]}
-        reviews={[]}
         canSubmit={canWrite}
         isBusy={false}
         unreviewedLocales={unreviewed}

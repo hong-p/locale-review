@@ -420,10 +420,9 @@ test("switches to another pull request from the review header", async ({ page })
     route.fulfill({ status: 200, contentType: "application/json", body: "[]" }),
   );
 
-  await page
-    .getByPlaceholder(/another pull request url/i)
-    .fill("https://github.com/example-org/docs-site/pull/9");
-  await page.getByRole("button", { name: /^open$/i }).click();
+  const field = page.getByPlaceholder(/another pull request url/i);
+  await field.fill("https://github.com/example-org/docs-site/pull/9");
+  await field.press("Enter");
 
   await expect(page.getByRole("heading", { name: /다른 번역 PR/ })).toBeVisible();
 });
@@ -432,8 +431,12 @@ test("rejects a bad URL typed into the review header", async ({ page }) => {
   await mockGitHub(page);
   await openPullRequest(page);
 
-  await page.getByPlaceholder(/another pull request url/i).fill("https://gitlab.com/a/b/pull/1");
-  await page.getByRole("button", { name: /^open$/i }).click();
+  const field = page.getByPlaceholder(/another pull request url/i);
+  await field.fill("https://gitlab.com/a/b/pull/1");
+  // Submitted from the field rather than by clicking Open: the header's refresh
+  // banner mounts asynchronously and can move the button out from under a click
+  // that Playwright has already decided is stable.
+  await field.press("Enter");
 
   await expect(page.getByRole("alert")).toContainText(/owner\/repository\/pull/i);
   // Still on the original pull request.
@@ -591,9 +594,10 @@ test("shows the overall conversation beside the review form", async ({ page }) =
   );
   await openPullRequest(page);
 
-  await page.getByRole("button", { name: /^review changes$/i }).click();
+  // Its own header button, with a count, rather than buried in the submit form.
+  await page.getByRole("button", { name: /^conversation \(1\)$/i }).click();
 
-  const conversation = page.getByRole("region", { name: /overall comments/i });
+  const conversation = page.getByRole("dialog", { name: /overall comments/i });
   await expect(conversation).toContainText("maintainer");
   await expect(conversation).toContainText("전반적으로 좋습니다");
 });
@@ -644,9 +648,9 @@ test("shows a submitted review body in the conversation", async ({ page }) => {
   );
   await openPullRequest(page);
 
-  await page.getByRole("button", { name: /^review changes$/i }).click();
+  await page.getByRole("button", { name: /^conversation \(1\)$/i }).click();
 
-  const conversation = page.getByRole("region", { name: /overall comments/i });
+  const conversation = page.getByRole("dialog", { name: /overall comments/i });
   await expect(conversation).toContainText("번역 좋습니다");
   // plan.md 7: the verdict is a word.
   await expect(conversation).toContainText("Approve");
@@ -713,5 +717,58 @@ test("says how to select a range, on screen rather than in a tooltip", async ({ 
   const after = page.getByRole("region", { name: "After", exact: true });
   await after.getByRole("button", { name: /add a comment on line 60/i }).click();
 
-  await expect(page.getByText(/shift-click another \+ to cover a range/i)).toBeVisible();
+  await expect(page.getByText(/drag down the \+ column, or shift-click/i)).toBeVisible();
+});
+
+test("selects a range by dragging down the gutter, as GitHub does", async ({ page }) => {
+  const recorder = await mockGitHub(page);
+  await openPullRequest(page);
+
+  const after = page.getByRole("region", { name: "After", exact: true });
+  const first = after.getByRole("button", { name: /add a comment on line 58/i });
+  const last = after.getByRole("button", { name: /add a comment on line 60/i });
+
+  // The lines are below the fold inside the panel's own scroller, and raw
+  // mouse moves do not scroll the way a click does.
+  await first.scrollIntoViewIfNeeded();
+  const from = await first.boundingBox();
+  const to = await last.boundingBox();
+
+  // Press on the first line's +, move down the gutter, release.
+  await page.mouse.move((from?.x ?? 0) + 6, (from?.y ?? 0) + 6);
+  await page.mouse.down();
+  await page.mouse.move((to?.x ?? 0) + 6, (to?.y ?? 0) + 6, { steps: 8 });
+  await page.mouse.up();
+
+  await expect(page.getByLabel(/new comment on lines 58–60/i)).toBeVisible();
+
+  await page.getByLabel(/new comment on lines 58–60/i).fill("이 문단이 어색합니다");
+  await page.getByRole("button", { name: /^comment now$/i }).click();
+
+  await expect
+    .poll(() => recorder.posted.find((p) => p.url.endsWith("/comments"))?.body)
+    .toMatchObject({ line: 60, start_line: 58, side: "RIGHT" });
+});
+
+test("a plain click still comments on one line", async ({ page }) => {
+  // The drag must not swallow the ordinary case.
+  await mockGitHub(page);
+  await openPullRequest(page);
+
+  const after = page.getByRole("region", { name: "After", exact: true });
+  await after.getByRole("button", { name: /add a comment on line 60/i }).click();
+
+  await expect(page.getByLabel(/new comment on line 60/i)).toBeVisible();
+});
+
+test("the conversation button shows how much there is to read", async ({ page }) => {
+  // Nothing pointed at the conversation before, so it went unnoticed however
+  // many comments were waiting.
+  await mockGitHub(page);
+  await openPullRequest(page);
+
+  await expect(page.getByRole("button", { name: /^conversation$/i })).toBeVisible();
+
+  await page.getByRole("button", { name: /^conversation$/i }).click();
+  await expect(page.getByText(/no overall comments/i)).toBeVisible();
 });
