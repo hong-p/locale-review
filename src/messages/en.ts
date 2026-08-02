@@ -21,7 +21,7 @@ export const messages = {
   token: {
     heading: "GitHub token",
     label: "Personal access token",
-    placeholder: "github_pat_… or ghp_…",
+    placeholder: "ghp_…",
     save: "Save token",
     clear: "Clear token",
     test: "Test connection",
@@ -30,15 +30,14 @@ export const messages = {
     rememberHint:
       "Off by default, the token is kept only for this browser tab. Turning this on stores it on this device — avoid it on a shared computer.",
     guidance:
-      "For your own repositories: a fine-grained token limited to those repositories, with Contents read-only and Pull requests read and write.",
-    guidanceThirdParty:
-      "To review someone else's public repository, use a classic token with the public_repo scope. A fine-grained token is always read-only on repositories you do not own, so it can display a pull request but cannot comment, review, or mark files viewed.",
-    createLink: "Create a fine-grained token",
+      "Use a classic token with the public_repo scope. Give it a short expiry, and add the repo scope only if you also review private repositories.",
+    guidanceFineGrained:
+      "A fine-grained token will not do. GitHub keeps one read-only on every repository you do not own, whatever it is granted, so a pull request would display but no comment, review, or Viewed mark would be accepted.",
     createClassicLink: "Create a classic token",
     signedInAs: "Signed in as",
     testPassed: "Connection verified. GitHub accepted this token for",
     repositoryScope:
-      "Whether it can read or write a particular repository is reported when you open a pull request there.",
+      "This checks the token, not what it may do: GitHub only says whether a write is allowed when one is actually sent.",
     connectionFailed: "That token could not be used.",
     notSet: "No token set",
   },
@@ -184,10 +183,10 @@ export const messages = {
     tokenRejectedBody:
       "GitHub did not accept the token. It may be expired, revoked, or mistyped. Set it again on the start screen.",
     writeForbiddenBody:
-      "GitHub accepted the token but refused to write. On your own repositories a fine-grained token needs Pull requests: Read and write. On a public repository owned by someone else a fine-grained token is read-only whatever it is granted, and only a classic token with the public_repo scope can write there.",
+      "GitHub accepted the token but refused to write. Commenting and reviewing need a classic token with the public_repo scope; a fine-grained token cannot write here.",
     permissionTitle: "This token cannot see that repository",
     permissionBody:
-      "GitHub accepted the token but refused this repository. A fine-grained token only reaches the repositories it was granted; check its repository access. For a public repository owned by someone else, a classic token with the public_repo scope is the one that also allows reviewing.",
+      "GitHub accepted the token but refused this repository. Reviewing needs a classic token with the public_repo scope, or the repo scope if the repository is private.",
     rateLimitTitle: "GitHub rate limit reached",
     rateLimitBody: "No further requests will succeed until the limit resets.",
     rateLimitResetsAt: "Resets at",

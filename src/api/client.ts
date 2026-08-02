@@ -361,7 +361,7 @@ function graphQLErrorToApiError(errors: unknown[], status: number): GitHubApiErr
 
 /** Constants, so no part of a GraphQL response reaches a message. */
 const GRAPHQL_FORBIDDEN =
-  "GitHub refused this action. On your own repositories a fine-grained token needs Pull requests: Read and write. On a public repository owned by someone else, a fine-grained token is read-only whatever it is granted, and a classic token with the public_repo scope is the only kind that can write.";
+  "GitHub refused this action. It needs a classic token with the public_repo scope; a fine-grained token cannot write here.";
 const GRAPHQL_NOT_FOUND = "GitHub could not find that resource, or the token cannot see it.";
 const GRAPHQL_RATE_LIMITED = "The GitHub GraphQL rate limit has been exceeded.";
 

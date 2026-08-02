@@ -5,7 +5,6 @@ import { testConnection } from "./connection";
 import styles from "./TokenPanel.module.css";
 import { useToken } from "./TokenContext";
 
-const CREATE_FINE_GRAINED_URL = "https://github.com/settings/personal-access-tokens/new";
 const CREATE_CLASSIC_URL = "https://github.com/settings/tokens/new?scopes=public_repo";
 
 /**
@@ -93,14 +92,11 @@ export function TokenPanel() {
       </div>
 
       <p className={styles.guidance}>{messages.token.guidance}</p>
-      {/* The distinction that actually decides which token works: a
-          fine-grained token cannot write to a repository you do not own, which
-          is most of what this app is used for. */}
-      <p className={styles.guidance}>{messages.token.guidanceThirdParty}</p>
+      {/* Only one kind of token is offered. Reviewing someone else's public
+          repository is what this app is for, and a fine-grained token cannot
+          do it, so naming both only invited the one that fails. */}
+      <p className={styles.guidance}>{messages.token.guidanceFineGrained}</p>
       <p className={styles.actions}>
-        <a href={CREATE_FINE_GRAINED_URL} target="_blank" rel="noreferrer noopener">
-          {messages.token.createLink}
-        </a>
         <a href={CREATE_CLASSIC_URL} target="_blank" rel="noreferrer noopener">
           {messages.token.createClassicLink}
         </a>

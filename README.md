@@ -59,7 +59,9 @@ npm run preview
 
 - GitHub 토큰이 있어야 PR을 열 수 있습니다. 인증 없는 요청은 보내지 않습니다.
 - 토큰은 기본적으로 `sessionStorage`에만 저장하며, 사용자가 명시적으로 선택한 경우에만 `localStorage`에 남깁니다.
-- 저장소 범위를 제한하고 만료 기간이 짧은 Fine-grained PAT 사용을 권장합니다.
+- `public_repo` 스코프를 가진 **classic PAT**가 필요합니다. GitHub은 fine-grained 토큰을 본인 소유가 아닌 공개 저장소에서 항상 읽기 전용으로 취급하므로, 남의 번역 PR에 댓글·리뷰·Viewed를 남길 수 없습니다.
+- classic PAT는 계정의 모든 공개 저장소에 쓰기 권한을 줍니다. 만료 기간을 짧게 잡으세요.
+- 토큰은 브라우저 origin별로 따로 저장됩니다. 로컬 개발 서버와 배포된 주소는 서로 다른 토큰을 가집니다.
 - 외부 분석 도구, 광고, 원격 스크립트를 사용하지 않으며 토큰은 GitHub API origin으로만 전송합니다.
 
 프로토타입을 실행했던 브라우저에는 `locale-review-settings`에 평문 토큰이 남아 있을 수 있습니다. 앱을 처음 실행할 때 이 항목을 자동으로 삭제합니다.
