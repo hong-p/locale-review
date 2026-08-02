@@ -439,3 +439,58 @@ test("rejects a bad URL typed into the review header", async ({ page }) => {
   // Still on the original pull request.
   await expect(page.getByRole("region", { name: "After", exact: true })).toBeVisible();
 });
+
+test("does not claim new changes when nothing moved", async ({ page }) => {
+  // The banner used to appear on every tab return because the baseline was
+  // compared against an empty marker rather than the pull request's own.
+  await mockGitHub(page);
+  await openPullRequest(page);
+
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      get: () => "visible",
+    });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+
+  await page.waitForTimeout(500);
+  await expect(page.getByText(/new changes are available/i)).toHaveCount(0);
+});
+
+test("says why a refused Viewed change failed", async ({ page }) => {
+  await mockGitHub(page);
+  await page.route("https://api.github.com/graphql", async (route) => {
+    const body = route.request().postDataJSON() as { query?: string };
+    if (body?.query?.includes("markFileAsViewed")) {
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ errors: [{ type: "FORBIDDEN", message: "not accessible" }] }),
+      });
+    }
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: {
+          repository: {
+            pullRequest: {
+              id: "PR_node",
+              files: {
+                pageInfo: { hasNextPage: false, endCursor: null },
+                nodes: [{ path: "content/ko/guide.md", viewerViewedState: "UNVIEWED" }],
+              },
+            },
+          },
+        },
+      }),
+    });
+  });
+  await openPullRequest(page);
+
+  await page.getByRole("checkbox", { name: /^viewed$/i }).click();
+
+  // Not "GitHub did not accept that change", which gave nothing to act on.
+  await expect(page.getByText(/pull requests write permission/i)).toBeVisible();
+});

@@ -149,7 +149,10 @@ function LoadedPullRequest({
         refresh={
           <RefreshBanner
             pullRequestRef={ref}
-            current={{ headSha: data.summary.headSha, reviewMarker: "" }}
+            current={{
+              headSha: data.summary.headSha,
+              reviewMarker: data.summary.updatedAt,
+            }}
             hasUnsentWork={reviewBody.trim() !== ""}
           />
         }

@@ -1,6 +1,7 @@
 import { useId } from "react";
 
 import { messages } from "../../messages/en";
+import { asGitHubApiError } from "../../api/client";
 import styles from "./ViewedToggle.module.css";
 import type { ViewedController } from "./useViewedState";
 
@@ -37,7 +38,19 @@ export function ViewedToggle({ path, controller }: ViewedToggleProps) {
       {controller.toggle === null && !controller.isLoading && (
         <span>{messages.viewed.unavailable}</span>
       )}
-      {controller.error !== null && <span role="alert">{messages.viewed.failed}</span>}
+      {controller.error !== null && (
+        <span role="alert" className={styles.error}>
+          {viewedFailureMessage(controller.error)}
+        </span>
+      )}
     </span>
   );
+}
+
+/** Says which failure it was, since "not accepted" gives nothing to act on. */
+function viewedFailureMessage(error: unknown): string {
+  const apiError = asGitHubApiError(error);
+  if (apiError?.code === "permission-denied") return apiError.message;
+  if (apiError?.code === "rate-limited") return apiError.message;
+  return messages.viewed.failed;
 }

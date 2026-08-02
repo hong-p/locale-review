@@ -26,6 +26,7 @@ type RawPullRequest = {
   state?: unknown;
   draft?: unknown;
   merged_at?: unknown;
+  updated_at?: unknown;
   html_url?: unknown;
   user?: unknown;
   base?: unknown;
@@ -137,6 +138,7 @@ export async function fetchPullRequest(
     isDraft: raw.draft === true,
     htmlUrl:
       asString(raw.html_url) ?? `https://github.com/${baseRepository.fullName}/pull/${number}`,
+    updatedAt: asString(raw.updated_at) ?? "",
   };
 
   const mergeBaseSha = await fetchMergeBaseSha(

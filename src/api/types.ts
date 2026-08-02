@@ -78,6 +78,11 @@ export type PullRequestSummary = {
   isDraft: boolean;
   /** The `Open on GitHub` target from plan.md 4.1. */
   htmlUrl: string;
+  /**
+   * GitHub's own last-modified marker, the baseline the freshness check on tab
+   * return compares against (plan.md 4.10).
+   */
+  updatedAt: string;
 };
 
 /**

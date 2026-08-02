@@ -388,3 +388,46 @@ describe("mutations", () => {
     expect(withoutBody).toBe("");
   });
 });
+
+describe("GraphQL error classification", () => {
+  const isData = (value: unknown): value is Record<string, unknown> => isRecord(value);
+
+  const withErrors = (errors: unknown[]) =>
+    server.use(http.post(`${ORIGIN}/graphql`, () => HttpResponse.json({ errors })));
+
+  it("maps FORBIDDEN to permission-denied with actionable wording", async () => {
+    // A refused mutation used to read as "malformed response", which told the
+    // user nothing they could act on.
+    withErrors([{ type: "FORBIDDEN", message: "Resource not accessible" }]);
+
+    const error = await captureError(() => client().graphql("mutation {}", {}, isData));
+
+    expect(error?.code).toBe("permission-denied");
+    expect(error?.message).toMatch(/pull requests write permission/i);
+  });
+
+  it("maps NOT_FOUND and RATE_LIMITED to their own codes", async () => {
+    withErrors([{ type: "NOT_FOUND" }]);
+    expect((await captureError(() => client().graphql("q", {}, isData)))?.code).toBe("not-found");
+
+    withErrors([{ type: "RATE_LIMITED" }]);
+    expect((await captureError(() => client().graphql("q", {}, isData)))?.code).toBe(
+      "rate-limited",
+    );
+  });
+
+  it("falls back to malformed-response for an unrecognised type", async () => {
+    withErrors([{ type: "SOMETHING_NEW" }]);
+
+    expect((await captureError(() => client().graphql("q", {}, isData)))?.code).toBe(
+      "malformed-response",
+    );
+  });
+
+  it("still copies no part of the GraphQL message", async () => {
+    withErrors([{ type: "FORBIDDEN", message: `leaked ${TOKEN}` }]);
+
+    const error = await captureError(() => client().graphql("q", {}, isData));
+    expect(JSON.stringify(error)).not.toContain(TOKEN);
+  });
+});
