@@ -30,23 +30,31 @@
   padding: var(--space-2) var(--space-4) 0;
 }
 
-/* The file header stays put; the diff below it takes the rest of the height. */
+/*
+ * The file header stays put; the diff below it takes the rest of the height.
+ *
+ * This is also the one place the review body scrolls. The panels keep their
+ * reading height (--diff-panel-height), so anything else that needs room —
+ * a block of outdated comments, several notices — pushes the diff down and
+ * scrolls here instead of shrinking the text under review.
+ */
 .scrollArea {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  overflow-y: auto;
 }
 
 /*
- * The diff takes what is left, but never less than this. On a short window the
- * area scrolls rather than squeezing the panels to a few lines.
+ * No min-height of its own: the automatic minimum of a flex item is its
+ * content, which is what keeps the panels at full height and hands the
+ * overflow to the scroller above.
  */
 .diffArea {
   display: flex;
   flex-direction: column;
   flex: 1;
-  min-height: 320px;
   padding: var(--space-3) var(--space-4) var(--space-4);
 }
 

@@ -2,8 +2,7 @@
 .viewer {
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  height: 100%;
+  flex: 1;
   gap: var(--space-3);
 }
 
@@ -34,14 +33,23 @@
   color: var(--color-fg-muted);
 }
 
+/*
+ * The panels have a height of their own rather than taking what is left.
+ *
+ * A definite height is what makes each panel scroll inside itself; with an
+ * automatic one the panels grow to the length of the file and the whole review
+ * body becomes one long scroll. It fills a tall window and never falls below
+ * the reading floor, so an outdated-comment block above the diff scrolls the
+ * body instead of squeezing the text being compared. The subtraction is the
+ * chrome above and below the panels: header, controls, file header, toolbar.
+ */
 .grid {
   display: grid;
-  min-height: 0;
+  height: max(var(--diff-panel-height), calc(100dvh - 20rem));
   gap: var(--space-3);
   /* The column count follows how many panels are visible; the custom property
      is the one runtime value plan.md 3.7 allows through inline style. */
   grid-template-columns: repeat(var(--visible-panels, 3), minmax(0, 1fr));
-  flex: 1;
 }
 
 /*

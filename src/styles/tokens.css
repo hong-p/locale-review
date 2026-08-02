@@ -45,6 +45,15 @@
   --space-5: 1.5rem;
   --space-6: 2rem;
 
+  /*
+   * The reading height of a diff panel.
+   *
+   * Panels grow past it when the window allows, but never shrink below it:
+   * whatever else appears above the diff — outdated comments most of all — has
+   * to scroll the review body rather than squeeze the text being compared.
+   */
+  --diff-panel-height: 28rem;
+
   /* Radii and borders */
   --radius-1: 4px;
   --radius-2: 6px;

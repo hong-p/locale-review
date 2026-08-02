@@ -772,3 +772,44 @@ test("the conversation button shows how much there is to read", async ({ page })
   await page.getByRole("button", { name: /^conversation$/i }).click();
   await expect(page.getByText(/no overall comments/i)).toBeVisible();
 });
+
+test("outdated comments scroll the review body instead of shrinking the panels", async ({
+  page,
+}) => {
+  // A comment whose line is gone is shown above the diff. It used to take its
+  // room out of the panels, which left the text under review a few lines tall.
+  await page.setViewportSize({ width: 1440, height: 800 });
+  await mockGitHub(page, {
+    reviewComments: [
+      {
+        id: 301,
+        path: "content/ko/guide.md",
+        line: null,
+        side: "RIGHT",
+        user: { login: "maintainer", avatar_url: null, html_url: null },
+        created_at: "2026-01-01T00:00:00Z",
+        body: "이 줄은 이제 없습니다",
+        body_html: "<p>이 줄은 이제 없습니다</p><p>두 번째 문단</p><p>세 번째 문단</p>",
+        html_url: "https://github.com/example-org/docs-site/pull/7#discussion_r301",
+      },
+    ],
+  });
+  await openPullRequest(page);
+
+  await expect(page.getByRole("region", { name: /no longer exist/i })).toBeVisible();
+
+  // 28rem is the floor the panels keep whatever else is on the page.
+  const panel = await page.getByRole("region", { name: "After", exact: true }).boundingBox();
+  expect(panel?.height ?? 0).toBeGreaterThanOrEqual(448);
+
+  // The room came from a scroll, and from the review body rather than the page.
+  const overflow = await page.evaluate(() => {
+    const area = document.querySelector('[class*="scrollArea"]');
+    return {
+      body: area === null ? 0 : area.scrollHeight - area.clientHeight,
+      page: document.body.scrollHeight - window.innerHeight,
+    };
+  });
+  expect(overflow.body).toBeGreaterThan(0);
+  expect(overflow.page).toBeLessThanOrEqual(1);
+});
