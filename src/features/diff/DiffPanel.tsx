@@ -1,6 +1,9 @@
-import { type RefObject, useMemo } from "react";
+import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { messages } from "../../messages/en";
+import { CommentComposer } from "../comments/CommentComposer";
+import { CommentThreadView } from "../comments/CommentThreadView";
+import type { CommentThread } from "../comments/fetchReviewComments";
 import { isRtlLocale } from "../locales/textDirection";
 import styles from "./DiffPanel.module.css";
 import { computeIntraLineDiff } from "./intraLineDiff";
@@ -18,8 +21,22 @@ export type PanelRow = {
   line: DiffLine;
   /** The paired line on the other side, when intra-line marking applies. */
   counterpart: string | null;
-  /** True where lines were skipped in `Changes only` mode. */
+  /** How many lines were skipped before this one in `Changes only` mode. */
   precedingGap: number | null;
+  /** Conversations anchored to this line (plan.md 4.8). */
+  threads: CommentThread[];
+  /** Whether GitHub would accept a new comment here (plan.md 4.9). */
+  canComment: boolean;
+};
+
+/** What a panel may do with comments, decided by the caller's permissions. */
+export type CommentCapabilities = {
+  /** Null disables replying and writing entirely (read-only mode). */
+  onReply: ((inReplyToId: number, body: string) => Promise<void>) | null;
+  onCreate:
+    | ((line: number, body: string, immediate: boolean, startLine?: number) => Promise<void>)
+    | null;
+  isBusy: boolean;
 };
 
 export type DiffPanelProps = {
@@ -32,6 +49,7 @@ export type DiffPanelProps = {
   onScroll?: () => void;
   searchTerm: string;
   emptyMessage?: string;
+  comments?: CommentCapabilities;
 };
 
 export function DiffPanel({
@@ -43,7 +61,63 @@ export function DiffPanel({
   onScroll,
   searchTerm,
   emptyMessage,
+  comments,
 }: DiffPanelProps) {
+  /**
+   * The lines a new comment covers (plan.md 4.9 allows a range).
+   *
+   * Held by the panel rather than a line, because a range belongs to no single
+   * one. Clicking + starts a one-line range; shift-clicking another + extends
+   * it, which is how GitHub's drag selection behaves without needing a drag.
+   */
+  const [range, setRange] = useState<{ start: number; end: number } | null>(null);
+  /**
+   * Set while the pointer is down on the gutter, as in GitHub's drag select.
+   *
+   * Kept in a ref as well as state: a pointer move fires before React has
+   * re-rendered with the new state, so the handler would read the previous
+   * value and the first line of a drag would be lost.
+   */
+  const [dragging, setDragging] = useState(false);
+  const draggingRef = useRef(false);
+
+  const setDrag = useCallback((value: boolean) => {
+    draggingRef.current = value;
+    setDragging(value);
+  }, []);
+
+  const extendTo = (line: number) => {
+    setRange((current) =>
+      current === null
+        ? { start: line, end: line }
+        : { start: Math.min(current.start, line), end: Math.max(current.end, line) },
+    );
+  };
+
+  const onAdd = (line: number, extend: boolean) => {
+    // Shift-click keeps the range reachable without a pointer, which a drag is
+    // not: it needs a mouse and says nothing to a keyboard or a screen reader.
+    if (extend) extendTo(line);
+    else setRange({ start: line, end: line });
+  };
+
+  const onDragStart = (line: number) => {
+    setRange({ start: line, end: line });
+    setDrag(true);
+  };
+
+  // The pointer is very often released outside the line it started on, so the
+  // end of a drag is listened for on the document rather than on a row.
+  useEffect(() => {
+    if (!dragging) return;
+    const stop = () => setDrag(false);
+    document.addEventListener("pointerup", stop);
+    document.addEventListener("pointercancel", stop);
+    return () => {
+      document.removeEventListener("pointerup", stop);
+      document.removeEventListener("pointercancel", stop);
+    };
+  }, [dragging, setDrag]);
   // plan.md 4.4: only the translation body follows the locale's direction;
   // numbers, markers, and chrome stay left-to-right.
   const dir = isRtlLocale(locale) ? "rtl" : "ltr";
@@ -76,6 +150,14 @@ export function DiffPanel({
                 dir={dir}
                 locale={locale}
                 searchTerm={searchTerm}
+                comments={comments}
+                range={range}
+                dragging={dragging}
+                draggingRef={draggingRef}
+                onAdd={onAdd}
+                onDragStart={onDragStart}
+                onDragOver={extendTo}
+                onCancel={() => setRange(null)}
               />
             ))}
           </div>
@@ -91,12 +173,28 @@ function PanelLine({
   dir,
   locale,
   searchTerm,
+  comments,
+  range,
+  dragging,
+  draggingRef,
+  onAdd,
+  onDragStart,
+  onDragOver,
+  onCancel,
 }: {
   row: PanelRow;
   side: DiffPanelProps["side"];
   dir: "ltr" | "rtl";
   locale: string;
   searchTerm: string;
+  comments?: CommentCapabilities;
+  range: { start: number; end: number } | null;
+  dragging: boolean;
+  draggingRef: RefObject<boolean>;
+  onAdd: (line: number, extend: boolean) => void;
+  onDragStart: (line: number) => void;
+  onDragOver: (line: number) => void;
+  onCancel: () => void;
 }) {
   const { line } = row;
   const number = side === "after" ? line.afterLine : line.beforeLine;
@@ -112,6 +210,9 @@ function PanelLine({
   const matchesSearch =
     searchTerm !== "" && line.text.toLowerCase().includes(searchTerm.toLowerCase());
 
+  const inRange = range !== null && number !== null && number >= range.start && number <= range.end;
+  const isRangeEnd = range !== null && number === range.end;
+
   return (
     <>
       {row.precedingGap !== null && (
@@ -122,17 +223,84 @@ function PanelLine({
         </div>
       )}
       <div
-        className={`${styles.line} ${rowClass ?? ""} ${matchesSearch ? styles.searchHit : ""}`}
+        className={`${styles.line} ${rowClass ?? ""} ${matchesSearch ? styles.searchHit : ""} ${
+          inRange ? styles.selected : ""
+        }`}
         data-change={change}
+        // Extending as the pointer passes a line, but only over a line GitHub
+        // would accept, so a drag cannot build an unpostable range.
+        onPointerEnter={() => {
+          if (draggingRef.current && row.canComment && number !== null) onDragOver(number);
+        }}
       >
         <span className={styles.number}>{number ?? ""}</span>
         <span className={styles.marker} aria-hidden="true">
           {marker}
         </span>
+        {/* plan.md 4.9: only a line GitHub accepts, and only when writing is
+            available. It sits in the gutter so it never shifts the text. */}
+        {row.canComment && comments?.onCreate ? (
+          <button
+            type="button"
+            className={inRange ? styles.addCommentActive : styles.addComment}
+            onClick={(event) => onAdd(number ?? 0, event.shiftKey)}
+            // Starting on pointer down is what makes the drag feel like
+            // GitHub's; the click above still fires for a plain press.
+            onPointerDown={(event) => {
+              if (event.button !== 0 || event.shiftKey) return;
+              onDragStart(number ?? 0);
+            }}
+            aria-label={`${messages.comments.addOnLine} ${number ?? ""}`}
+            aria-pressed={inRange}
+            title={messages.comments.shiftToExtend}
+          >
+            +
+          </button>
+        ) : (
+          <span className={styles.addCommentSpacer} />
+        )}
+
         <span className={styles.text} dir={dir} lang={locale}>
           <LineText row={row} side={side} locale={locale} />
         </span>
       </div>
+
+      {row.threads.map((thread) => (
+        <div className={styles.threadRow} key={thread.rootId}>
+          <div className={styles.threadCell}>
+            <CommentThreadView
+              thread={thread}
+              canReply={comments?.onReply !== null && comments?.onReply !== undefined}
+              isBusy={comments?.isBusy ?? false}
+              onReply={comments?.onReply ?? (async () => undefined)}
+            />
+          </div>
+        </div>
+      ))}
+
+      {/* The composer sits at the end of the range, so a multi-line selection
+          reads downward into the box the way GitHub's does. */}
+      {isRangeEnd && !dragging && comments?.onCreate && range !== null && (
+        <div className={styles.threadRow}>
+          <div className={styles.threadCell}>
+            <CommentComposer
+              line={range.end}
+              startLine={range.start === range.end ? undefined : range.start}
+              isBusy={comments.isBusy}
+              onCancel={onCancel}
+              onSubmit={async (body, immediate) => {
+                await comments.onCreate?.(
+                  range.end,
+                  body,
+                  immediate,
+                  range.start === range.end ? undefined : range.start,
+                );
+                onCancel();
+              }}
+            />
+          </div>
+        </div>
+      )}
     </>
   );
 }

@@ -1,7 +1,10 @@
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 
 import { messages } from "../../messages/en";
+import styles from "./ReviewSummaryBox.module.css";
 import type { ReviewEvent } from "./submitReview";
+import { MarkdownToolbar } from "./MarkdownToolbar";
+import { writeFailureMessage } from "./writeFailureMessage";
 
 /**
  * Submitting the review (plan.md 4.9).
@@ -41,6 +44,7 @@ export function ReviewSummaryBox({
   const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bodyId = useId();
+  const textarea = useRef<HTMLTextAreaElement | null>(null);
 
   const chosen = EVENTS.find((entry) => entry.event === event);
   const needsConfirmation = (chosen?.needsWarning ?? false) && unreviewedLocales.length > 0;
@@ -51,35 +55,47 @@ export function ReviewSummaryBox({
     try {
       await onSubmit(event, body);
       setError(null);
-    } catch {
+    } catch (failure) {
       // plan.md 4.9: the text stays put on failure.
-      setError(messages.review.submitFailed);
+      setError(writeFailureMessage(failure, messages.review.submitFailed));
     }
   };
 
   return (
-    <section aria-labelledby={`${bodyId}-heading`}>
-      <h2 id={`${bodyId}-heading`}>{messages.review.heading}</h2>
+    <section className={styles.box} aria-labelledby={`${bodyId}-heading`}>
+      <h2 id={`${bodyId}-heading`} className={styles.label}>
+        {messages.review.heading}
+      </h2>
 
       {pendingCommentCount > 0 && (
-        <p>
+        <p className={styles.pending}>
           {messages.review.pendingCount} {pendingCommentCount}
         </p>
       )}
 
-      <label htmlFor={bodyId}>{messages.review.bodyLabel}</label>
+      <label htmlFor={bodyId} className={styles.label}>
+        {messages.review.bodyLabel}
+      </label>
+      <MarkdownToolbar
+        textarea={textarea}
+        value={body}
+        onChange={onBodyChange}
+        disabled={!canSubmit}
+      />
       <textarea
         id={bodyId}
+        ref={textarea}
+        className={styles.textarea}
         value={body}
         rows={4}
         disabled={!canSubmit}
         onChange={(changeEvent) => onBodyChange(changeEvent.target.value)}
       />
 
-      <fieldset disabled={!canSubmit}>
+      <fieldset className={styles.verdicts} disabled={!canSubmit}>
         <legend>{messages.review.verdictLegend}</legend>
         {EVENTS.map((entry) => (
-          <label key={entry.event}>
+          <label key={entry.event} className={styles.verdict}>
             <input
               type="radio"
               name="review-event"
@@ -95,7 +111,7 @@ export function ReviewSummaryBox({
       </fieldset>
 
       {needsConfirmation && (
-        <div role="alert">
+        <div role="alert" className={styles.warning}>
           <p>
             {messages.review.localeWarning} {unreviewedLocales.join(", ")}
           </p>
@@ -112,14 +128,19 @@ export function ReviewSummaryBox({
 
       <button
         type="button"
+        className={styles.submit}
         disabled={!canSubmit || isBusy || blocked}
         onClick={() => void submit()}
       >
         {isBusy ? messages.review.submitting : messages.review.submit}
       </button>
 
-      {!canSubmit && <p>{messages.pullRequest.readOnlyBody}</p>}
-      {error !== null && <p role="alert">{error}</p>}
+      {!canSubmit && <p className={styles.readOnly}>{messages.pullRequest.readOnlyBody}</p>}
+      {error !== null && (
+        <p role="alert" className={styles.error}>
+          {error}
+        </p>
+      )}
     </section>
   );
 }

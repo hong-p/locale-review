@@ -66,9 +66,10 @@ describe("toGitHubApiError", () => {
       "x-ratelimit-reset": String(RESET_EPOCH_SECONDS),
     });
 
-    expect(toGitHubApiError(response, buildPermissionErrorPayload())).toEqual({
+    // Asserted by shape rather than by the exact sentence: pinning the wording
+    // makes every copy change a test change without checking anything.
+    expect(toGitHubApiError(response, buildPermissionErrorPayload())).toMatchObject({
       code: "permission-denied",
-      message: "Your GitHub token does not have access to this repository.",
       status: 403,
     });
   });

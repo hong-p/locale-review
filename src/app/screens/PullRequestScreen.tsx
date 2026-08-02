@@ -10,9 +10,14 @@ import { checkRepositoryAccess, hasCapability } from "../../features/auth/connec
 import { draftKey, draftSlot } from "../../features/comments/draftStorage";
 import { TranslationFileBrowser } from "../../features/files/TranslationFileBrowser";
 import { parsePullRequestRouteParams } from "../../features/pull/parsePullRequestUrl";
+import { OpenPullRequestField } from "../../features/pull/OpenPullRequestField";
 import { RefreshBanner } from "../../features/pull/RefreshBanner";
 import { usePullRequest } from "../../features/pull/usePullRequest";
 import { messages } from "../../messages/en";
+import { ConversationPopover } from "../../features/comments/ConversationPopover";
+import { ReviewPopover } from "../../features/comments/ReviewPopover";
+import { useCommentActions, useReviewComments } from "../../features/comments/useReviewComments";
+import shell from "../AppShell.module.css";
 import { ROUTE_START } from "../routes";
 
 /**
@@ -124,65 +129,138 @@ function LoadedPullRequest({
     slot.write({ ...stored, reviewBody });
   }, [slot, reviewBody]);
 
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [conversationOpen, setConversationOpen] = useState(false);
+  /**
+   * Locales the filter is hiding, reported upward by the browser so the review
+   * form in the header can warn about them (plan.md 4.3).
+   */
+  const [unreviewed, setUnreviewed] = useState<readonly string[]>([]);
+
+  // Created here rather than inside the browser: the review form lives in the
+  // header, so both surfaces need the same actions and neither should hand
+  // functions to the other.
+  const actions = useCommentActions(ref, data.summary.headSha, viewerLogin, canWrite);
+  const conversations = useReviewComments(ref);
+
   return (
-    <main>
-      <PullRequestHeader summary={data.summary} onClose={onClose} />
-
-      {access.data?.state === "accessible" && !canWrite && (
-        <p role="status">{messages.pullRequest.readOnlyBody}</p>
-      )}
-
-      <RefreshBanner
-        pullRequestRef={ref}
-        current={{ headSha: data.summary.headSha, reviewMarker: "" }}
-        hasUnsentWork={reviewBody.trim() !== ""}
+    <div className={shell.shell}>
+      <PullRequestHeader
+        summary={data.summary}
+        onClose={onClose}
+        onOpenReview={() => setReviewOpen(true)}
+        onOpenConversation={() => setConversationOpen(true)}
+        conversationCount={
+          (conversations.data?.issueComments.length ?? 0) +
+          (conversations.data?.reviews.length ?? 0)
+        }
+        refresh={
+          <RefreshBanner
+            pullRequestRef={ref}
+            current={{
+              headSha: data.summary.headSha,
+              reviewMarker: data.summary.updatedAt,
+            }}
+            hasUnsentWork={reviewBody.trim() !== ""}
+          />
+        }
       />
 
       <TranslationFileBrowser
         pullRequestRef={ref}
         diffBase={data.diffBase}
         canWrite={canWrite}
-        viewerLogin={viewerLogin}
-        reviewBody={reviewBody}
-        onReviewBodyChange={setReviewBody}
+        actions={actions}
+        readOnlyNotice={false}
+        onLocaleScopeChange={setUnreviewed}
       />
-    </main>
+
+      <ConversationPopover
+        open={conversationOpen}
+        onClose={() => setConversationOpen(false)}
+        issueComments={conversations.data?.issueComments ?? []}
+        reviews={conversations.data?.reviews ?? []}
+      />
+
+      <ReviewPopover
+        open={reviewOpen}
+        onClose={() => setReviewOpen(false)}
+        canSubmit={canWrite}
+        isBusy={actions.isBusy}
+        unreviewedLocales={unreviewed}
+        pendingCommentCount={0}
+        body={reviewBody}
+        onBodyChange={setReviewBody}
+        onSubmit={async (event, body) => {
+          await actions.submit(event, body);
+          // plan.md 4.9: the form clears only once GitHub confirmed.
+          setReviewBody("");
+          setReviewOpen(false);
+        }}
+      />
+    </div>
   );
 }
 
 function PullRequestHeader({
   summary,
   onClose,
+  onOpenReview,
+  onOpenConversation,
+  conversationCount,
+  refresh,
 }: {
   summary: PullRequestSummary;
   onClose: () => void;
+  onOpenReview: () => void;
+  onOpenConversation: () => void;
+  /** Shown on the button, so the reviewer knows there is something to read. */
+  conversationCount: number;
+  refresh: React.ReactNode;
 }) {
   return (
-    <header>
-      <p>{summary.baseRepository.fullName}</p>
-      <h1>
-        {summary.title} <span>#{summary.number}</span>
-      </h1>
+    <header className={shell.header}>
+      <div className={shell.identity}>
+        <p className={shell.repository}>{summary.baseRepository.fullName}</p>
+        <h1 className={shell.title}>
+          {summary.title} <span className={shell.number}>#{summary.number}</span>
+        </h1>
+      </div>
 
-      {/* plan.md 7 forbids conveying state by colour alone, so the label is text. */}
-      <p>{stateLabel(summary)}</p>
-
-      <p>
-        {summary.author?.login ?? messages.pullRequest.authorUnknown}
-        {" · "}
-        <span>
-          {messages.pullRequest.branches}: {summary.baseRef} ← {summary.headRef}
+      <div className={shell.meta}>
+        {/* plan.md 7 forbids conveying state by colour alone, so it is a word. */}
+        <StateBadge summary={summary} />
+        <span>{summary.author?.login ?? messages.pullRequest.authorUnknown}</span>
+        <span className={shell.branches}>
+          {summary.baseRef} ← {summary.headRef}
         </span>
-      </p>
+      </div>
 
-      <a href={summary.htmlUrl} target="_blank" rel="noreferrer noopener">
-        {messages.pullRequest.openOnGitHub}
-      </a>
-      <button type="button" onClick={onClose}>
-        {messages.pullRequest.close}
-      </button>
+      <div className={shell.headerActions}>
+        {/* Switching pull requests without going back to the start screen. */}
+        <OpenPullRequestField variant="compact" />
+        {refresh}
+        <a href={summary.htmlUrl} target="_blank" rel="noreferrer noopener">
+          {messages.pullRequest.openOnGitHub}
+        </a>
+        <button type="button" onClick={onOpenConversation}>
+          {messages.comments.openConversation}
+          {conversationCount > 0 && ` (${conversationCount})`}
+        </button>
+        <button type="button" onClick={onOpenReview}>
+          {messages.review.open}
+        </button>
+        <button type="button" onClick={onClose}>
+          {messages.pullRequest.close}
+        </button>
+      </div>
     </header>
   );
+}
+
+function StateBadge({ summary }: { summary: PullRequestSummary }) {
+  const state = summary.isDraft ? "draft" : summary.state;
+  return <span className={`${shell.badge} ${shell[state] ?? ""}`}>{stateLabel(summary)}</span>;
 }
 
 function stateLabel(summary: PullRequestSummary): string {

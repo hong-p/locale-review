@@ -151,7 +151,7 @@ test("renders right-to-left text without flipping the line numbers", async ({ pa
   await page.goto("/#/github/example-org/docs-site/pull/7");
 
   await page.getByRole("checkbox", { name: /^ar/ }).check();
-  await page.getByRole("button", { name: /content\/ar\/guide\.md/ }).click();
+  await page.getByLabel(/^file$/i).selectOption("content/ar/guide.md");
 
   const body = page
     .getByRole("region", { name: "After", exact: true })
@@ -177,13 +177,13 @@ test("filters files by locale and loads content only for the selected one", asyn
   await openPullRequest(page);
 
   // ko is the default preference, so the Japanese file is hidden.
-  await expect(page.getByRole("button", { name: /content\/ko\/guide\.md/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: /content\/ja\/guide\.md/ })).toBeHidden();
+  await expect(page.getByRole("option", { name: "content/ko/guide.md" })).toBeAttached();
+  await expect(page.getByRole("option", { name: "content/ja/guide.md" })).toHaveCount(0);
 
   expect(recorder.contentRequests.some((path) => path.includes("/content/ja/"))).toBe(false);
 
   await page.getByRole("checkbox", { name: /^ja/ }).check();
-  await page.getByRole("button", { name: /content\/ja\/guide\.md/ }).click();
+  await page.getByLabel(/^file$/i).selectOption("content/ja/guide.md");
 
   await expect
     .poll(() => recorder.contentRequests.some((path) => path.includes("/content/ja/")))
@@ -252,6 +252,7 @@ test("submits a review and warns about locales the filter hid", async ({ page })
   });
   await openPullRequest(page);
 
+  await page.getByRole("button", { name: /^review changes$/i }).click();
   await page.getByRole("radio", { name: /^approve$/i }).check();
 
   // plan.md 4.3: a verdict covers every locale in the pull request.
@@ -266,14 +267,18 @@ test("submits a review and warns about locales the filter hid", async ({ page })
     .toMatchObject({ event: "APPROVE" });
 });
 
-test("disables every write control for a token that cannot write", async ({ page }) => {
+test("keeps reviewing available without push access", async ({ page }) => {
+  // GitHub allows comments, approvals, and change requests with read access,
+  // and Viewed is a per-user state. Gating these on push would block reviewing
+  // other people's open-source repositories, which is the point of this app.
   await mockGitHub(page, { canWrite: false });
   await openPullRequest(page);
 
-  await expect(page.getByRole("checkbox", { name: /^viewed$/i })).toBeDisabled();
-  await expect(page.getByLabel(/review summary/i)).toBeDisabled();
-  await expect(page.getByRole("radio", { name: /^approve$/i })).toBeDisabled();
-  await expect(page.getByRole("button", { name: /^submit review$/i })).toBeDisabled();
+  await expect(page.getByRole("checkbox", { name: /^viewed$/i })).toBeEnabled();
+
+  await page.getByRole("button", { name: /^review changes$/i }).click();
+  await expect(page.getByLabel(/review summary/i)).toBeEnabled();
+  await expect(page.getByRole("radio", { name: /^approve$/i })).toBeEnabled();
 });
 
 test("keeps the review summary across a reload", async ({ page }) => {
@@ -281,10 +286,14 @@ test("keeps the review summary across a reload", async ({ page }) => {
   await mockGitHub(page);
   await openPullRequest(page);
 
+  await page.getByRole("button", { name: /^review changes$/i }).click();
   await page.getByLabel(/review summary/i).fill("전반적으로 좋습니다");
+  await page.keyboard.press("Escape");
+
   await page.reload();
   await page.getByRole("region", { name: "After", exact: true }).waitFor();
 
+  await page.getByRole("button", { name: /^review changes$/i }).click();
   await expect(page.getByLabel(/review summary/i)).toHaveValue("전반적으로 좋습니다");
 });
 
@@ -292,10 +301,515 @@ test("warns before a refresh that could disturb unsent text", async ({ page }) =
   await mockGitHub(page);
   await openPullRequest(page);
 
+  await page.getByRole("button", { name: /^review changes$/i }).click();
   await page.getByLabel(/review summary/i).fill("작성 중");
-  await page.getByRole("button", { name: /^refresh$/i }).click();
+  await page.keyboard.press("Escape");
 
+  await page.getByRole("button", { name: /^refresh$/i }).click();
   await expect(page.getByText(/you have unsent text/i)).toBeVisible();
   await page.getByRole("button", { name: /keep editing/i }).click();
+
+  await page.getByRole("button", { name: /^review changes$/i }).click();
   await expect(page.getByLabel(/review summary/i)).toHaveValue("작성 중");
+});
+
+test("writes an inline comment from the line it belongs to", async ({ page }) => {
+  // The add button used to be revealed on hover only, which made the whole
+  // feature undiscoverable; it is now visible on every commentable line.
+  const recorder = await mockGitHub(page);
+  await openPullRequest(page);
+
+  const after = page.getByRole("region", { name: "After", exact: true });
+  await after.getByRole("button", { name: /add a comment on line 60/i }).click();
+
+  await page.getByLabel(/new comment on line 60/i).fill("여기 표현이 어색합니다");
+  await page.getByRole("button", { name: /^comment now$/i }).click();
+
+  await expect
+    .poll(() => recorder.posted.find((p) => p.url.endsWith("/comments"))?.body)
+    .toMatchObject({ line: 60, side: "RIGHT", body: "여기 표현이 어색합니다" });
+});
+
+test("adds an inline comment to the pending review instead of posting it", async ({ page }) => {
+  const recorder = await mockGitHub(page);
+  await openPullRequest(page);
+
+  const after = page.getByRole("region", { name: "After", exact: true });
+  await after.getByRole("button", { name: /add a comment on line 60/i }).click();
+  await page.getByLabel(/new comment on line 60/i).fill("리뷰에 모아둡니다");
+  await page.getByRole("button", { name: /^add to review$/i }).click();
+
+  // The pending route carries the review id; the immediate route does not.
+  await expect
+    .poll(() => recorder.posted.map((p) => p.url).join(" "))
+    .toContain("/reviews/55/comments");
+});
+
+test("offers no add button on a line outside the patch", async ({ page }) => {
+  // plan.md 4.9: GitHub rejects a position its own diff does not contain.
+  await mockGitHub(page);
+  await openPullRequest(page);
+
+  const after = page.getByRole("region", { name: "After", exact: true });
+  await expect(after.getByRole("button", { name: /add a comment on line 1$/i })).toHaveCount(0);
+  await expect(after.getByRole("button", { name: /add a comment on line 60/i })).toBeVisible();
+});
+
+test("shows an existing conversation beside the code, not in the gutter", async ({ page }) => {
+  await mockGitHub(page, {
+    reviewComments: [
+      {
+        id: 101,
+        path: "content/ko/guide.md",
+        line: 60,
+        side: "RIGHT",
+        user: { login: "maintainer", avatar_url: null, html_url: null },
+        created_at: "2026-01-01T00:00:00Z",
+        body: "어색합니다",
+        body_html: "<p>어색합니다</p>",
+        html_url: "https://github.com/example-org/docs-site/pull/7#discussion_r101",
+      },
+    ],
+  });
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await openPullRequest(page);
+
+  const thread = page.getByRole("region", { name: /conversation on/i });
+  await expect(thread).toBeVisible();
+
+  // It should be wide enough to read, not squeezed into the number column.
+  const box = await thread.boundingBox();
+  const panel = await page.getByRole("region", { name: "After", exact: true }).boundingBox();
+  expect((box?.width ?? 0) / (panel?.width ?? 1)).toBeGreaterThan(0.5);
+});
+
+test("Close review returns to the start screen", async ({ page }) => {
+  await mockGitHub(page);
+  await openPullRequest(page);
+
+  await page.getByRole("button", { name: /^close review$/i }).click();
+
+  await expect(page.getByRole("heading", { name: /open a pull request/i })).toBeVisible();
+  expect(page.url()).toContain("#/");
+  expect(page.url()).not.toContain("/pull/");
+});
+
+test("switches to another pull request from the review header", async ({ page }) => {
+  await mockGitHub(page);
+  await openPullRequest(page);
+
+  // A second pull request, so the switch has somewhere to land.
+  await page.route("https://api.github.com/repos/example-org/docs-site/pulls/9", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        number: 9,
+        title: "다른 번역 PR",
+        state: "open",
+        draft: false,
+        merged_at: null,
+        html_url: "https://github.com/example-org/docs-site/pull/9",
+        user: { login: "translator" },
+        base: { ref: "main", sha: "b", repo: { full_name: "example-org/docs-site" } },
+        head: { ref: "ko-2", sha: "head-sha", repo: { full_name: "example-org/docs-site" } },
+      }),
+    }),
+  );
+  await page.route("https://api.github.com/repos/example-org/docs-site/pulls/9/files**", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: "[]" }),
+  );
+
+  const field = page.getByPlaceholder(/another pull request url/i);
+  await field.fill("https://github.com/example-org/docs-site/pull/9");
+  await field.press("Enter");
+
+  await expect(page.getByRole("heading", { name: /다른 번역 PR/ })).toBeVisible();
+});
+
+test("rejects a bad URL typed into the review header", async ({ page }) => {
+  await mockGitHub(page);
+  await openPullRequest(page);
+
+  const field = page.getByPlaceholder(/another pull request url/i);
+  await field.fill("https://gitlab.com/a/b/pull/1");
+  // Submitted from the field rather than by clicking Open: the header's refresh
+  // banner mounts asynchronously and can move the button out from under a click
+  // that Playwright has already decided is stable.
+  await field.press("Enter");
+
+  await expect(page.getByRole("alert")).toContainText(/owner\/repository\/pull/i);
+  // Still on the original pull request.
+  await expect(page.getByRole("region", { name: "After", exact: true })).toBeVisible();
+});
+
+test("does not claim new changes when nothing moved", async ({ page }) => {
+  // The banner used to appear on every tab return because the baseline was
+  // compared against an empty marker rather than the pull request's own.
+  await mockGitHub(page);
+  await openPullRequest(page);
+
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      get: () => "visible",
+    });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+
+  await page.waitForTimeout(500);
+  await expect(page.getByText(/new changes are available/i)).toHaveCount(0);
+});
+
+test("says why a refused Viewed change failed", async ({ page }) => {
+  await mockGitHub(page);
+  await page.route("https://api.github.com/graphql", async (route) => {
+    const body = route.request().postDataJSON() as { query?: string };
+    if (body?.query?.includes("markFileAsViewed")) {
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ errors: [{ type: "FORBIDDEN", message: "not accessible" }] }),
+      });
+    }
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: {
+          repository: {
+            pullRequest: {
+              id: "PR_node",
+              files: {
+                pageInfo: { hasNextPage: false, endCursor: null },
+                nodes: [{ path: "content/ko/guide.md", viewerViewedState: "UNVIEWED" }],
+              },
+            },
+          },
+        },
+      }),
+    });
+  });
+  await openPullRequest(page);
+
+  await page.getByRole("checkbox", { name: /^viewed$/i }).click();
+
+  // Not "GitHub did not accept that change", which gave nothing to act on.
+  // The wording names the fine-grained limitation too, since a fine-grained
+  // token can never write to a repository the user does not own.
+  await expect(page.getByText(/pull requests: read and write/i)).toBeVisible();
+  await expect(page.getByText(/public_repo/i)).toBeVisible();
+});
+
+test("comments on a range of lines with shift-click", async ({ page }) => {
+  // plan.md 4.9 supports start_line/start_side; the panel exposes it by
+  // extending the selection rather than requiring a drag.
+  const recorder = await mockGitHub(page);
+  await openPullRequest(page);
+
+  const after = page.getByRole("region", { name: "After", exact: true });
+  // The fixture's hunk covers 58 to 60, and only those lines take a comment.
+  await after.getByRole("button", { name: /add a comment on line 58/i }).click();
+  await after
+    .getByRole("button", { name: /add a comment on line 60/i })
+    .click({ modifiers: ["Shift"] });
+
+  await expect(page.getByLabel(/new comment on lines 58–60/i)).toBeVisible();
+  await page.getByLabel(/new comment on lines 58–60/i).fill("이 문단 전체가 어색합니다");
+  await page.getByRole("button", { name: /^comment now$/i }).click();
+
+  await expect
+    .poll(() => recorder.posted.find((p) => p.url.endsWith("/comments"))?.body)
+    .toMatchObject({ line: 60, start_line: 58, side: "RIGHT", start_side: "RIGHT" });
+});
+
+test("refresh reports that it ran", async ({ page }) => {
+  // It used to invalidate queries whose contents are keyed by commit and
+  // marked permanently fresh, so nothing refetched and nothing changed.
+  await mockGitHub(page);
+  await openPullRequest(page);
+
+  let refetched = 0;
+  await page.route(
+    "https://api.github.com/repos/example-org/docs-site/pulls/7/files**",
+    (route) => {
+      refetched += 1;
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            filename: "content/ko/guide.md",
+            status: "modified",
+            additions: 1,
+            deletions: 1,
+            patch: "@@ -58,3 +58,3 @@\n a\n-b\n+c\n a",
+            sha: "blob-ko",
+          },
+        ]),
+      });
+    },
+  );
+
+  await page.getByRole("button", { name: /^refresh$/i }).click();
+
+  await expect.poll(() => refetched).toBeGreaterThan(0);
+});
+
+test("panels take the height the window offers", async ({ page }) => {
+  // A 60vh cap left half a large screen unused, which is the opposite of what
+  // a three-column reader needs.
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await mockGitHub(page);
+  await openPullRequest(page);
+
+  const panel = await page.getByRole("region", { name: "After", exact: true }).boundingBox();
+  expect((panel?.height ?? 0) / 1000).toBeGreaterThan(0.6);
+
+  // And the page itself does not scroll; the panel does.
+  const pageOverflow = await page.evaluate(() => document.body.scrollHeight - window.innerHeight);
+  expect(pageOverflow).toBeLessThanOrEqual(1);
+});
+
+test("shows the overall conversation beside the review form", async ({ page }) => {
+  // plan.md 4.8: these were fetched and never rendered anywhere.
+  await mockGitHub(page);
+  await page.route(
+    "https://api.github.com/repos/example-org/docs-site/issues/7/comments**",
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            id: 5,
+            user: { login: "maintainer", avatar_url: null, html_url: null },
+            created_at: "2026-01-01T00:00:00Z",
+            body: "전반적으로 좋습니다",
+            body_html: "<p>전반적으로 좋습니다</p>",
+            html_url: "https://github.com/example-org/docs-site/pull/7#issuecomment-5",
+          },
+        ]),
+      }),
+  );
+  await openPullRequest(page);
+
+  // Its own header button, with a count, rather than buried in the submit form.
+  await page.getByRole("button", { name: /^conversation \(1\)$/i }).click();
+
+  const conversation = page.getByRole("dialog", { name: /overall comments/i });
+  await expect(conversation).toContainText("maintainer");
+  await expect(conversation).toContainText("전반적으로 좋습니다");
+});
+
+test("the inline editor fills the panel width", async ({ page }) => {
+  // It was rendering far narrower than the panel, which left a comment box too
+  // small to write a sentence in.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockGitHub(page);
+  await openPullRequest(page);
+
+  const after = page.getByRole("region", { name: "After", exact: true });
+  await after.getByRole("button", { name: /add a comment on line 60/i }).click();
+
+  const editor = await page.getByLabel(/new comment on line 60/i).boundingBox();
+  const panel = await after.boundingBox();
+
+  // Only the row and composer padding, no gutter indent.
+  expect((editor?.width ?? 0) / (panel?.width ?? 1)).toBeGreaterThan(0.88);
+});
+
+test("shows a submitted review body in the conversation", async ({ page }) => {
+  // A review body is not an issue comment; fetching only issue comments left
+  // every "left a comment" review invisible (plan.md 4.8).
+  await mockGitHub(page);
+  await page.route(
+    "https://api.github.com/repos/example-org/docs-site/pulls/7/reviews**",
+    (route) => {
+      if (route.request().method() !== "GET") {
+        return route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            id: 70,
+            state: "APPROVED",
+            user: { login: "maintainer" },
+            submitted_at: "2026-01-03T00:00:00Z",
+            body: "번역 좋습니다",
+            body_html: "<p>번역 좋습니다</p>",
+            html_url: "https://github.com/example-org/docs-site/pull/7#pullrequestreview-70",
+          },
+        ]),
+      });
+    },
+  );
+  await openPullRequest(page);
+
+  await page.getByRole("button", { name: /^conversation \(1\)$/i }).click();
+
+  const conversation = page.getByRole("dialog", { name: /overall comments/i });
+  await expect(conversation).toContainText("번역 좋습니다");
+  // plan.md 7: the verdict is a word.
+  await expect(conversation).toContainText("Approve");
+});
+
+test("offers markdown shortcuts in the comment editor", async ({ page }) => {
+  await mockGitHub(page);
+  await openPullRequest(page);
+
+  const after = page.getByRole("region", { name: "After", exact: true });
+  await after.getByRole("button", { name: /add a comment on line 60/i }).click();
+
+  const editor = page.getByLabel(/new comment on line 60/i);
+  await editor.fill("어색합니다");
+  await editor.selectText();
+  await page.getByRole("button", { name: "Bold", exact: true }).click();
+
+  await expect(editor).toHaveValue("**어색합니다**");
+});
+
+test("wraps long prose instead of scrolling sideways", async ({ page }) => {
+  // A Markdown paragraph is one very long line. Scrolling sideways through a
+  // Korean paragraph is unreadable, and it also dragged comment rows out to
+  // the width of the longest line.
+  await page.setViewportSize({ width: 1200, height: 800 });
+  await mockGitHub(page, {
+    contentFor: (path) =>
+      path.includes("/content/ko/") ? `${"매우 긴 한국어 문단입니다. ".repeat(40)}\n` : null,
+  });
+  await openPullRequest(page);
+
+  const scroller = page.getByRole("region", { name: "After", exact: true }).locator("div").first();
+
+  const overflow = await scroller.evaluate((el) => el.scrollWidth - el.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+});
+
+test("a comment row stays the width of the panel beside a long line", async ({ page }) => {
+  await page.setViewportSize({ width: 1200, height: 800 });
+  await mockGitHub(page, {
+    contentFor: (path) =>
+      path.includes("/content/ko/")
+        ? `${"짧은 줄\n".repeat(58)}${"아주 긴 줄입니다. ".repeat(40)}\n`
+        : null,
+  });
+  await openPullRequest(page);
+
+  const after = page.getByRole("region", { name: "After", exact: true });
+  await after.getByRole("button", { name: /add a comment on line 59/i }).click();
+
+  const editor = await page.getByLabel(/new comment on line 59/i).boundingBox();
+  const panel = await after.boundingBox();
+
+  expect((editor?.width ?? 0) / (panel?.width ?? 1)).toBeLessThan(1);
+  expect((editor?.width ?? 0) / (panel?.width ?? 1)).toBeGreaterThan(0.85);
+});
+
+test("says how to select a range, on screen rather than in a tooltip", async ({ page }) => {
+  // The range feature worked but nothing visible mentioned it, so it may as
+  // well not have existed — and a title attribute says nothing on touch.
+  await mockGitHub(page);
+  await openPullRequest(page);
+
+  const after = page.getByRole("region", { name: "After", exact: true });
+  await after.getByRole("button", { name: /add a comment on line 60/i }).click();
+
+  await expect(page.getByText(/drag down the \+ column, or shift-click/i)).toBeVisible();
+});
+
+test("selects a range by dragging down the gutter, as GitHub does", async ({ page }) => {
+  const recorder = await mockGitHub(page);
+  await openPullRequest(page);
+
+  const after = page.getByRole("region", { name: "After", exact: true });
+  const first = after.getByRole("button", { name: /add a comment on line 58/i });
+  const last = after.getByRole("button", { name: /add a comment on line 60/i });
+
+  // The lines are below the fold inside the panel's own scroller, and raw
+  // mouse moves do not scroll the way a click does.
+  await first.scrollIntoViewIfNeeded();
+  const from = await first.boundingBox();
+  const to = await last.boundingBox();
+
+  // Press on the first line's +, move down the gutter, release.
+  await page.mouse.move((from?.x ?? 0) + 6, (from?.y ?? 0) + 6);
+  await page.mouse.down();
+  await page.mouse.move((to?.x ?? 0) + 6, (to?.y ?? 0) + 6, { steps: 8 });
+  await page.mouse.up();
+
+  await expect(page.getByLabel(/new comment on lines 58–60/i)).toBeVisible();
+
+  await page.getByLabel(/new comment on lines 58–60/i).fill("이 문단이 어색합니다");
+  await page.getByRole("button", { name: /^comment now$/i }).click();
+
+  await expect
+    .poll(() => recorder.posted.find((p) => p.url.endsWith("/comments"))?.body)
+    .toMatchObject({ line: 60, start_line: 58, side: "RIGHT" });
+});
+
+test("a plain click still comments on one line", async ({ page }) => {
+  // The drag must not swallow the ordinary case.
+  await mockGitHub(page);
+  await openPullRequest(page);
+
+  const after = page.getByRole("region", { name: "After", exact: true });
+  await after.getByRole("button", { name: /add a comment on line 60/i }).click();
+
+  await expect(page.getByLabel(/new comment on line 60/i)).toBeVisible();
+});
+
+test("the conversation button shows how much there is to read", async ({ page }) => {
+  // Nothing pointed at the conversation before, so it went unnoticed however
+  // many comments were waiting.
+  await mockGitHub(page);
+  await openPullRequest(page);
+
+  await expect(page.getByRole("button", { name: /^conversation$/i })).toBeVisible();
+
+  await page.getByRole("button", { name: /^conversation$/i }).click();
+  await expect(page.getByText(/no overall comments/i)).toBeVisible();
+});
+
+test("outdated comments scroll the review body instead of shrinking the panels", async ({
+  page,
+}) => {
+  // A comment whose line is gone is shown above the diff. It used to take its
+  // room out of the panels, which left the text under review a few lines tall.
+  await page.setViewportSize({ width: 1440, height: 800 });
+  await mockGitHub(page, {
+    reviewComments: [
+      {
+        id: 301,
+        path: "content/ko/guide.md",
+        line: null,
+        side: "RIGHT",
+        user: { login: "maintainer", avatar_url: null, html_url: null },
+        created_at: "2026-01-01T00:00:00Z",
+        body: "이 줄은 이제 없습니다",
+        body_html: "<p>이 줄은 이제 없습니다</p><p>두 번째 문단</p><p>세 번째 문단</p>",
+        html_url: "https://github.com/example-org/docs-site/pull/7#discussion_r301",
+      },
+    ],
+  });
+  await openPullRequest(page);
+
+  await expect(page.getByRole("region", { name: /no longer exist/i })).toBeVisible();
+
+  // 28rem is the floor the panels keep whatever else is on the page.
+  const panel = await page.getByRole("region", { name: "After", exact: true }).boundingBox();
+  expect(panel?.height ?? 0).toBeGreaterThanOrEqual(448);
+
+  // The room came from a scroll, and from the review body rather than the page.
+  const overflow = await page.evaluate(() => {
+    const area = document.querySelector('[class*="scrollArea"]');
+    return {
+      body: area === null ? 0 : area.scrollHeight - area.clientHeight,
+      page: document.body.scrollHeight - window.innerHeight,
+    };
+  });
+  expect(overflow.body).toBeGreaterThan(0);
+  expect(overflow.page).toBeLessThanOrEqual(1);
 });

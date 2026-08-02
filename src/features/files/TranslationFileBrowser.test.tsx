@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PullRequestDiffBase } from "../../api/types";
 import { server } from "../../test/msw/server";
 import { TokenProvider } from "../auth/TokenContext";
+import { useCommentActions } from "../comments/useReviewComments";
 import { TranslationFileBrowser } from "./TranslationFileBrowser";
 
 const ORIGIN = "https://api.github.com";
@@ -43,6 +44,21 @@ function trackContents(): string[] {
   return requested;
 }
 
+/** The screen creates the write actions and passes them in; this mirrors that. */
+function Browser({ canWrite }: { canWrite: boolean }) {
+  const actions = useCommentActions(PR_REF, "head", "translator", canWrite);
+  return (
+    <TranslationFileBrowser
+      pullRequestRef={PR_REF}
+      diffBase={DIFF_BASE}
+      canWrite={canWrite}
+      actions={actions}
+      readOnlyNotice={false}
+      onLocaleScopeChange={() => {}}
+    />
+  );
+}
+
 function renderBrowser(overrides: { canWrite?: boolean } = {}) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
@@ -51,14 +67,7 @@ function renderBrowser(overrides: { canWrite?: boolean } = {}) {
   return render(
     <QueryClientProvider client={queryClient}>
       <TokenProvider>
-        <TranslationFileBrowser
-          pullRequestRef={PR_REF}
-          diffBase={DIFF_BASE}
-          canWrite={overrides.canWrite ?? false}
-          viewerLogin="translator"
-          reviewBody=""
-          onReviewBodyChange={() => {}}
-        />
+        <Browser canWrite={overrides.canWrite ?? false} />
       </TokenProvider>
     </QueryClientProvider>,
   );
@@ -93,8 +102,8 @@ describe("locale filtering", () => {
     renderBrowser();
 
     // ko is the default preference from plan.md 4.3.
-    expect(await screen.findByRole("button", { name: /content\/ko\/guide\.md/ })).toBeVisible();
-    expect(screen.queryByRole("button", { name: /content\/ja\/guide\.md/ })).toBeNull();
+    expect(await screen.findByRole("option", { name: "content/ko/guide.md" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "content/ja/guide.md" })).toBeNull();
     expect(screen.getByText(/files hidden by the locale filter/i)).toHaveTextContent("2");
   });
 
@@ -147,7 +156,7 @@ describe("locale filtering", () => {
     await screen.findByRole("checkbox", { name: /ja/ });
     await user.click(screen.getByRole("checkbox", { name: /ja/ }));
 
-    expect(await screen.findByRole("button", { name: /content\/ja\/a\.md/ })).toBeVisible();
+    expect(await screen.findByRole("option", { name: "content/ja/a.md" })).toBeInTheDocument();
   });
 });
 
@@ -166,7 +175,7 @@ describe("lazy content loading", () => {
     );
 
     renderBrowser();
-    await screen.findByRole("button", { name: /content\/ko\/a\.md/ });
+    await screen.findByRole("option", { name: "content/ko/a.md" });
     await waitFor(() => expect(requested.length).toBeGreaterThan(0));
 
     // Three versions of one file, and nothing from the other two.
@@ -185,7 +194,8 @@ describe("lazy content loading", () => {
     );
 
     renderBrowser();
-    await user.click(await screen.findByRole("button", { name: /content\/ko\/b\.md/ }));
+    await screen.findByRole("option", { name: "content/ko/b.md" });
+    await user.selectOptions(screen.getByLabelText(/^file$/i), "content/ko/b.md");
 
     await waitFor(() => {
       expect(requested.some((path) => path.includes("/b.md"))).toBe(true);
@@ -245,7 +255,7 @@ describe("states the reviewer has to be told about", () => {
 
     // Only the directory layout is active by default, so the suffix file is
     // simply not a translation rather than ambiguous.
-    expect(await screen.findByRole("button", { name: /content\/ko\/a\.md/ })).toBeVisible();
+    expect(await screen.findByRole("option", { name: "content/ko/a.md" })).toBeInTheDocument();
   });
 
   it("marks a file GitHub gave no patch for as non-commentable", async () => {

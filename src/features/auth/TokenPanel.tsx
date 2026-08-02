@@ -2,9 +2,11 @@ import { type FormEvent, useId, useState } from "react";
 
 import { messages } from "../../messages/en";
 import { testConnection } from "./connection";
+import styles from "./TokenPanel.module.css";
 import { useToken } from "./TokenContext";
 
-const CREATE_TOKEN_URL = "https://github.com/settings/personal-access-tokens/new";
+const CREATE_FINE_GRAINED_URL = "https://github.com/settings/personal-access-tokens/new";
+const CREATE_CLASSIC_URL = "https://github.com/settings/tokens/new?scopes=public_repo";
 
 /**
  * Setting, testing, and clearing the token (plan.md 5.1, 5.2).
@@ -52,42 +54,59 @@ export function TokenPanel() {
   };
 
   return (
-    <section aria-labelledby={`${fieldId}-heading`}>
-      <h2 id={`${fieldId}-heading`}>{messages.token.heading}</h2>
+    <section className={styles.panel} aria-labelledby={`${fieldId}-heading`}>
+      <h2 id={`${fieldId}-heading`} className={styles.title}>
+        {messages.token.heading}
+      </h2>
 
-      <form onSubmit={onSubmit}>
-        <label htmlFor={fieldId}>{messages.token.label}</label>
-        <input
-          id={fieldId}
-          type="password"
-          autoComplete="off"
-          spellCheck={false}
-          value={draft}
-          placeholder={messages.token.placeholder}
-          onChange={(event) => setDraft(event.target.value)}
-        />
-        <button type="submit" disabled={draft.trim() === ""}>
-          {messages.token.save}
-        </button>
+      <form className={styles.form} onSubmit={onSubmit}>
+        <label htmlFor={fieldId} className={styles.label}>
+          {messages.token.label}
+        </label>
+        <div className={styles.row}>
+          <input
+            id={fieldId}
+            type="password"
+            autoComplete="off"
+            spellCheck={false}
+            value={draft}
+            placeholder={messages.token.placeholder}
+            onChange={(event) => setDraft(event.target.value)}
+          />
+          <button type="submit" disabled={draft.trim() === ""}>
+            {messages.token.save}
+          </button>
+        </div>
       </form>
 
-      <div>
+      <div className={styles.remember}>
         <input
           id={rememberId}
           type="checkbox"
           checked={mode === "local"}
           onChange={(event) => setMode(event.target.checked ? "local" : "session")}
         />
-        <label htmlFor={rememberId}>{messages.token.remember}</label>
-        <p>{messages.token.rememberHint}</p>
+        <label htmlFor={rememberId}>
+          {messages.token.remember}
+          <span className={styles.hint}> {messages.token.rememberHint}</span>
+        </label>
       </div>
 
-      <p>{messages.token.guidance}</p>
-      <a href={CREATE_TOKEN_URL} target="_blank" rel="noreferrer noopener">
-        {messages.token.createLink}
-      </a>
+      <p className={styles.guidance}>{messages.token.guidance}</p>
+      {/* The distinction that actually decides which token works: a
+          fine-grained token cannot write to a repository you do not own, which
+          is most of what this app is used for. */}
+      <p className={styles.guidance}>{messages.token.guidanceThirdParty}</p>
+      <p className={styles.actions}>
+        <a href={CREATE_FINE_GRAINED_URL} target="_blank" rel="noreferrer noopener">
+          {messages.token.createLink}
+        </a>
+        <a href={CREATE_CLASSIC_URL} target="_blank" rel="noreferrer noopener">
+          {messages.token.createClassicLink}
+        </a>
+      </p>
 
-      <p>
+      <div className={styles.actions}>
         {token === null ? (
           messages.token.notSet
         ) : (
@@ -100,13 +119,19 @@ export function TokenPanel() {
             </button>
           </>
         )}
-      </p>
+      </div>
 
       {connection?.state === "authenticated" && (
-        <p>
+        <p className={styles.status}>
           {/* The avatar is decorative: the login next to it carries the meaning. */}
           {connection.user.avatarUrl && (
-            <img src={connection.user.avatarUrl} alt="" width={20} height={20} />
+            <img
+              className={styles.avatar}
+              src={connection.user.avatarUrl}
+              alt=""
+              width={20}
+              height={20}
+            />
           )}
           {messages.token.signedInAs} {connection.user.login}
         </p>
@@ -115,14 +140,14 @@ export function TokenPanel() {
       {/* The answer to the button, stated as a result rather than left to be
           inferred from a line that was already there. */}
       {tested === "ok" && connection?.state === "authenticated" && (
-        <p role="status">
+        <p role="status" className={`${styles.status} ${styles.ok}`}>
           {messages.token.testPassed} {connection.user.login}. {messages.token.repositoryScope}
         </p>
       )}
       {/* A rejected token is worth reporting whether or not the button was
           pressed, since the automatic check finds it first. */}
       {connection?.state === "invalid-token" && (
-        <p role="alert">
+        <p role="alert" className={`${styles.status} ${styles.failed}`}>
           {messages.token.connectionFailed} {connection.error.message}
         </p>
       )}

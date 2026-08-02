@@ -1,0 +1,89 @@
+/*
+ * The review body (design 2026-08-02, revised).
+ *
+ * One column, not two. A left sidebar took width the three panels need more,
+ * so file selection, locale filtering, and progress moved into the header
+ * strip above the diff.
+ */
+
+.body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: var(--border-width) solid var(--color-border);
+  background-color: var(--color-canvas-subtle);
+}
+
+.notices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4) 0;
+}
+
+/*
+ * The file header stays put; the diff below it takes the rest of the height.
+ *
+ * This is also the one place the review body scrolls. The panels keep their
+ * reading height (--diff-panel-height), so anything else that needs room —
+ * a block of outdated comments, several notices — pushes the diff down and
+ * scrolls here instead of shrinking the text under review.
+ */
+.scrollArea {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/*
+ * No min-height of its own: the automatic minimum of a flex item is its
+ * content, which is what keeps the panels at full height and hands the
+ * overflow to the scroller above.
+ */
+.diffArea {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+
+.infoNotice,
+.warnNotice {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width) solid;
+  border-radius: var(--radius-2);
+  font-size: var(--font-size-sm);
+}
+
+.infoNotice {
+  border-color: var(--color-border);
+  background-color: var(--color-canvas-subtle);
+  color: var(--color-fg-muted);
+}
+
+.warnNotice {
+  border-color: var(--color-attention-fg);
+  background-color: var(--color-attention-subtle);
+  color: var(--color-fg);
+}
+
+@media (max-width: 900px) {
+  .controls,
+  .notices,
+  .diffArea {
+    padding-left: var(--space-3);
+    padding-right: var(--space-3);
+  }
+}

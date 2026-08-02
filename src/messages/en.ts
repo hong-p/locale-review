@@ -12,6 +12,8 @@ export const messages = {
     heading: "Open a pull request",
     urlLabel: "Pull request URL",
     urlPlaceholder: "https://github.com/owner/repository/pull/123",
+    urlShortPlaceholder: "Another pull request URL",
+    openShort: "Open",
     submit: "Open pull request",
     tokenRequired: "A GitHub token is required before a pull request can be opened.",
     privacy: "This app runs entirely in your browser. No server stores your token or review data.",
@@ -28,8 +30,11 @@ export const messages = {
     rememberHint:
       "Off by default, the token is kept only for this browser tab. Turning this on stores it on this device — avoid it on a shared computer.",
     guidance:
-      "A fine-grained token limited to the repositories you review, with Contents read-only, Pull requests read and write, and a short expiry.",
-    createLink: "Create a fine-grained token on GitHub",
+      "For your own repositories: a fine-grained token limited to those repositories, with Contents read-only and Pull requests read and write.",
+    guidanceThirdParty:
+      "To review someone else's public repository, use a classic token with the public_repo scope. A fine-grained token is always read-only on repositories you do not own, so it can display a pull request but cannot comment, review, or mark files viewed.",
+    createLink: "Create a fine-grained token",
+    createClassicLink: "Create a classic token",
     signedInAs: "Signed in as",
     testPassed: "Connection verified. GitHub accepted this token for",
     repositoryScope:
@@ -40,7 +45,7 @@ export const messages = {
   pullRequest: {
     openOnGitHub: "Open on GitHub",
     retry: "Retry",
-    close: "Close pull request",
+    close: "Close review",
     loading: "Loading the pull request…",
     draft: "Draft",
     open: "Open",
@@ -51,10 +56,13 @@ export const messages = {
     authorUnknown: "Unknown author",
     readOnlyTitle: "Read-only",
     readOnlyBody:
-      "Your token can read this repository but cannot write to it, so reviewing actions are disabled.",
+      "You do not have push access to this repository. Reviewing still works: GitHub allows comments, approvals, and change requests with read access.",
   },
   files: {
     sidebarLabel: "Changed translation files",
+    fileLabel: "File",
+    previousFile: "Previous file",
+    nextFile: "Next file",
     localeLegend: "Locales in this pull request",
     hiddenByFilter: "Files hidden by the locale filter:",
     noneSelected: "No files match the selected locales.",
@@ -97,7 +105,7 @@ export const messages = {
   viewed: {
     label: "Viewed",
     progress: "Reviewed",
-    unavailable: "Viewed requires a token that can write to this repository.",
+    unavailable: "Viewed is unavailable for this repository.",
     updating: "Updating…",
     failed: "GitHub did not accept that change.",
   },
@@ -111,11 +119,26 @@ export const messages = {
     reply: "Send reply",
     sending: "Sending…",
     replyFailed: "The reply was not sent. Your text is still here.",
-    replyUnavailable: "Replying requires a token that can write to this repository.",
+    replyUnavailable: "Replying needs a token with the Pull requests write permission.",
     overallHeading: "Overall comments",
+    addOnLine: "Add a comment on line",
+    newOnLine: "New comment on line",
+    newOnLines: "New comment on lines",
+    shiftToExtend: "Drag down the + column, or shift-click another +, to cover a range",
+    postNow: "Comment now",
+    addToReview: "Add to review",
+    cancel: "Cancel",
+    createFailed: "The comment was not posted. Your text is still here.",
+    outdatedHeading: "Comments on lines that no longer exist",
+    dismissed: "Dismissed",
+    openConversation: "Conversation",
+    closeConversation: "Close the conversation",
+    noOverall: "No overall comments on this pull request yet.",
   },
   review: {
     heading: "Submit review",
+    open: "Review changes",
+    close: "Close the review form",
     bodyLabel: "Review summary",
     verdictLegend: "Verdict",
     comment: "Comment",
@@ -131,6 +154,7 @@ export const messages = {
   },
   refresh: {
     refresh: "Refresh",
+    refreshing: "Refreshing…",
     newChanges: "New changes are available on GitHub.",
     reload: "Reload",
     reloadAnyway: "Reload anyway",
@@ -141,6 +165,15 @@ export const messages = {
     copy: "Copy",
     delete: "Delete",
   },
+  markdown: {
+    label: "Markdown formatting",
+    bold: "Bold",
+    italic: "Italic",
+    code: "Code",
+    quote: "Quote",
+    list: "Bulleted list",
+    link: "Link",
+  },
   loadErrors: {
     invalidUrlTitle: "That is not a pull request URL",
     invalidUrlBody: "Enter a URL like https://github.com/owner/repository/pull/123.",
@@ -150,9 +183,11 @@ export const messages = {
     tokenRejectedTitle: "Your token was rejected",
     tokenRejectedBody:
       "GitHub did not accept the token. It may be expired, revoked, or mistyped. Set it again on the start screen.",
+    writeForbiddenBody:
+      "GitHub accepted the token but refused to write. On your own repositories a fine-grained token needs Pull requests: Read and write. On a public repository owned by someone else a fine-grained token is read-only whatever it is granted, and only a classic token with the public_repo scope can write there.",
     permissionTitle: "This token cannot see that repository",
     permissionBody:
-      "GitHub accepted the token but refused the repository. A fine-grained token only reaches the repositories it was granted, and reading a public repository you do not own needs Public Repositories (read-only) on the token. Check the token's repository access, or use a classic token with the public_repo scope.",
+      "GitHub accepted the token but refused this repository. A fine-grained token only reaches the repositories it was granted; check its repository access. For a public repository owned by someone else, a classic token with the public_repo scope is the one that also allows reviewing.",
     rateLimitTitle: "GitHub rate limit reached",
     rateLimitBody: "No further requests will succeed until the limit resets.",
     rateLimitResetsAt: "Resets at",

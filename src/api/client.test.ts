@@ -388,3 +388,66 @@ describe("mutations", () => {
     expect(withoutBody).toBe("");
   });
 });
+
+describe("GraphQL error classification", () => {
+  const isData = (value: unknown): value is Record<string, unknown> => isRecord(value);
+
+  const withErrors = (errors: unknown[]) =>
+    server.use(http.post(`${ORIGIN}/graphql`, () => HttpResponse.json({ errors })));
+
+  it("maps FORBIDDEN to permission-denied with actionable wording", async () => {
+    // A refused mutation used to read as "malformed response", which told the
+    // user nothing they could act on.
+    withErrors([{ type: "FORBIDDEN", message: "Resource not accessible" }]);
+
+    const error = await captureError(() => client().graphql("mutation {}", {}, isData));
+
+    expect(error?.code).toBe("permission-denied");
+    // The wording has to name both cases: a fine-grained token needs Pull
+    // requests write on your own repository, and cannot write at all to one
+    // you do not own, where only a classic token works.
+    expect(error?.message).toMatch(/pull requests: read and write/i);
+    expect(error?.message).toMatch(/public_repo/i);
+  });
+
+  it("maps NOT_FOUND and RATE_LIMITED to their own codes", async () => {
+    withErrors([{ type: "NOT_FOUND" }]);
+    expect((await captureError(() => client().graphql("q", {}, isData)))?.code).toBe("not-found");
+
+    withErrors([{ type: "RATE_LIMITED" }]);
+    expect((await captureError(() => client().graphql("q", {}, isData)))?.code).toBe(
+      "rate-limited",
+    );
+  });
+
+  it("falls back to malformed-response for an unrecognised type", async () => {
+    withErrors([{ type: "SOMETHING_NEW" }]);
+
+    expect((await captureError(() => client().graphql("q", {}, isData)))?.code).toBe(
+      "malformed-response",
+    );
+  });
+
+  it("still copies no part of the GraphQL message", async () => {
+    withErrors([{ type: "FORBIDDEN", message: `leaked ${TOKEN}` }]);
+
+    const error = await captureError(() => client().graphql("q", {}, isData));
+    expect(JSON.stringify(error)).not.toContain(TOKEN);
+  });
+});
+
+describe("HTTP caching", () => {
+  it("revalidates instead of reusing the browser's copy", async () => {
+    // GitHub marks most reads cacheable for a minute, which made a refetch
+    // right after a write return the state from before it.
+    let seen: RequestInit | undefined;
+    const fetchImpl: typeof fetch = async (_url, init) => {
+      seen = init;
+      return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
+    };
+
+    await createGitHubClient({ token: TOKEN, fetchImpl }).requestJson("/user", isRecord);
+
+    expect(seen?.cache).toBe("no-cache");
+  });
+});

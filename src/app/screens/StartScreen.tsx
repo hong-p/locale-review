@@ -1,11 +1,9 @@
-import { type FormEvent, useId, useState } from "react";
-import { useNavigate } from "react-router";
-
 import { TokenPanel } from "../../features/auth/TokenPanel";
 import { useToken } from "../../features/auth/TokenContext";
-import { parsePullRequestUrl, pullRequestRefToPath } from "../../features/pull/parsePullRequestUrl";
 import { messages } from "../../messages/en";
+import { OpenPullRequestField } from "../../features/pull/OpenPullRequestField";
 import { ThemeToggle } from "../ThemeToggle";
+import styles from "./StartScreen.module.css";
 
 /**
  * plan.md 7's start screen.
@@ -17,72 +15,30 @@ import { ThemeToggle } from "../ThemeToggle";
  */
 export function StartScreen() {
   const { token } = useToken();
-  const navigate = useNavigate();
-  const [url, setUrl] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const fieldId = useId();
-  const errorId = useId();
-
-  const onSubmit = (event: FormEvent) => {
-    event.preventDefault();
-
-    if (token === null) {
-      setError(messages.start.tokenRequired);
-      return;
-    }
-
-    const parsed = parsePullRequestUrl(url);
-    if (!parsed.ok) {
-      setError(messages.loadErrors.invalidUrlBody);
-      return;
-    }
-
-    setError(null);
-    void navigate(pullRequestRefToPath(parsed.ref));
-  };
 
   return (
-    <main>
-      <header>
-        <h1>{messages.app.name}</h1>
-        <p>{messages.app.tagline}</p>
+    <main className={styles.page}>
+      <header className={styles.masthead}>
+        <div>
+          <h1 className={styles.title}>{messages.app.name}</h1>
+          <p className={styles.tagline}>{messages.app.tagline}</p>
+        </div>
         <ThemeToggle />
       </header>
 
-      <section aria-labelledby="start-heading">
-        <h2 id="start-heading">{messages.start.heading}</h2>
+      <section className={styles.card} aria-labelledby="start-heading">
+        <h2 id="start-heading" className={styles.cardTitle}>
+          {messages.start.heading}
+        </h2>
 
-        <form onSubmit={onSubmit} noValidate>
-          <label htmlFor={fieldId}>{messages.start.urlLabel}</label>
-          <input
-            id={fieldId}
-            type="text"
-            inputMode="url"
-            autoComplete="off"
-            value={url}
-            placeholder={messages.start.urlPlaceholder}
-            aria-invalid={error !== null}
-            aria-describedby={error === null ? undefined : errorId}
-            onChange={(event) => {
-              setUrl(event.target.value);
-              setError(null);
-            }}
-          />
-          <button type="submit">{messages.start.submit}</button>
-        </form>
-
-        {/* Announced rather than shown only in colour, per plan.md 7. */}
-        {error !== null && (
-          <p id={errorId} role="alert">
-            {error}
-          </p>
-        )}
+        <OpenPullRequestField variant="full" />
+        {token === null && <p className={styles.privacy}>{messages.start.tokenRequired}</p>}
       </section>
 
       <TokenPanel />
 
       <footer>
-        <p>{messages.start.privacy}</p>
+        <p className={styles.privacy}>{messages.start.privacy}</p>
       </footer>
     </main>
   );

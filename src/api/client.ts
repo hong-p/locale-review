@@ -129,6 +129,13 @@ export function createGitHubClient(options: GitHubClientOptions) {
         // credentials would be pointless and widens what the request carries.
         credentials: "omit",
         redirect: "follow",
+        // GitHub returns `Cache-Control: private, max-age=60` on most REST
+        // reads, so a refetch straight after a write was being served the
+        // browser's copy from before it — a reply would post and then not
+        // appear for a minute. "no-cache" still revalidates rather than
+        // refetching blind, and GitHub does not charge a 304 against the rate
+        // limit, so the conditional request stays free.
+        cache: "no-cache",
       });
     } catch (error) {
       // An abort is the caller's own doing and must stay distinguishable from
@@ -247,12 +254,7 @@ export function createGitHubClient(options: GitHubClientOptions) {
     // GraphQL reports failure inside a 200, so an errors array is the only
     // signal that the request did not do what was asked.
     if (body.errors && body.errors.length > 0) {
-      throw new GitHubRequestError(
-        malformedResponseError("unexpected-shape", {
-          status: response.status,
-          field: "errors",
-        }),
-      );
+      throw new GitHubRequestError(graphQLErrorToApiError(body.errors, response.status));
     }
     if (!parse(body.data)) {
       throw new GitHubRequestError(
@@ -310,6 +312,58 @@ type GraphQLEnvelope = {
   data?: unknown;
   errors?: unknown[];
 };
+
+/**
+ * Maps a GraphQL failure onto the shared error model.
+ *
+ * Only the `type` field is read. It is a fixed GitHub enum rather than free
+ * text, so classifying on it tells the user something actionable without
+ * copying a remote string into a message, which plan.md 5.2 rules out.
+ */
+function graphQLErrorToApiError(errors: unknown[], status: number): GitHubApiError {
+  const types = new Set<string>();
+  for (const entry of errors) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const type = (entry as { type?: unknown }).type;
+    if (typeof type === "string") types.add(type);
+  }
+
+  if (types.has("FORBIDDEN") || types.has("INSUFFICIENT_SCOPES")) {
+    return {
+      code: "permission-denied",
+      message: GRAPHQL_FORBIDDEN,
+      // 403 is the REST equivalent; the screen branches on this to say the
+      // token reached GitHub but was refused the action.
+      status: 403,
+    };
+  }
+  if (types.has("UNAUTHORIZED")) {
+    return { code: "permission-denied", message: GRAPHQL_FORBIDDEN, status: 403 };
+  }
+  if (types.has("NOT_FOUND")) {
+    return { code: "not-found", message: GRAPHQL_NOT_FOUND, status: 404 };
+  }
+  if (types.has("RATE_LIMITED")) {
+    return {
+      code: "rate-limited",
+      message: GRAPHQL_RATE_LIMITED,
+      status,
+      rateLimitKind: "primary",
+      limit: null,
+      remaining: null,
+      resetAt: null,
+      retryAfterSeconds: null,
+    };
+  }
+
+  return malformedResponseError("unexpected-shape", { status, field: "errors" });
+}
+
+/** Constants, so no part of a GraphQL response reaches a message. */
+const GRAPHQL_FORBIDDEN =
+  "GitHub refused this action. On your own repositories a fine-grained token needs Pull requests: Read and write. On a public repository owned by someone else, a fine-grained token is read-only whatever it is granted, and a classic token with the public_repo scope is the only kind that can write.";
+const GRAPHQL_NOT_FOUND = "GitHub could not find that resource, or the token cannot see it.";
+const GRAPHQL_RATE_LIMITED = "The GitHub GraphQL rate limit has been exceeded.";
 
 function isGraphQLEnvelope(value: unknown): value is GraphQLEnvelope {
   if (typeof value !== "object" || value === null) return false;

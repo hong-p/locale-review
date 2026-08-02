@@ -81,7 +81,7 @@ describe("checkRepositoryAccess", () => {
     server.use(http.get(`${ORIGIN}/repos/acme/docs`, () => HttpResponse.json(body, { status })));
   };
 
-  it("grants every capability when the token can push", async () => {
+  it("reports push access when the token has it", async () => {
     mockRepo({ private: false, permissions: { pull: true, push: true, admin: false } });
 
     const access = await checkRepositoryAccess(client(), "acme", "docs");
@@ -100,8 +100,10 @@ describe("checkRepositoryAccess", () => {
 
     expect(access.state).toBe("accessible");
     if (access.state !== "accessible") return;
+    // canWrite reports push access, which is worth showing but does not gate
+    // the review surface.
     expect(access.canWrite).toBe(false);
-    expect(access.capabilities).toEqual(["read"]);
+    expect(access.capabilities).toEqual(["read", "comment", "review", "viewed"]);
   });
 
   it("treats maintain and admin as write access", async () => {

@@ -1,0 +1,88 @@
+.composer {
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-2);
+  background-color: var(--color-canvas);
+  box-shadow: var(--shadow-1);
+}
+
+.label {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-fg-muted);
+}
+
+.textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--space-2);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-2);
+  background-color: var(--color-canvas);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  resize: vertical;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.actions button {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-2);
+  border: var(--border-width) solid var(--color-border);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  transition: background-color var(--duration-fast);
+}
+
+.actions button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.ghost {
+  background-color: transparent;
+  color: var(--color-fg-muted);
+}
+
+.secondary {
+  background-color: var(--color-canvas-subtle);
+  color: var(--color-fg);
+}
+
+.primary {
+  background-color: var(--color-accent-emphasis);
+  border-color: var(--color-accent-emphasis);
+  color: var(--color-fg-on-emphasis);
+  font-weight: 600;
+}
+
+.error {
+  margin: 0;
+  color: var(--color-danger-fg);
+  font-size: var(--font-size-sm);
+}
+
+.heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.hint {
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-sm);
+  font-weight: 400;
+}

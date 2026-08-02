@@ -1,4 +1,5 @@
 import { messages } from "../messages/en";
+import styles from "./screens/StartScreen.module.css";
 import { type ThemePreference, useTheme } from "../features/settings/theme";
 
 const OPTIONS: ReadonlyArray<{ value: ThemePreference; label: string }> = [
@@ -11,7 +12,7 @@ export function ThemeToggle() {
   const { preference, setPreference } = useTheme();
 
   return (
-    <fieldset>
+    <fieldset className={styles.themes}>
       <legend>{messages.settings.theme}</legend>
       {OPTIONS.map((option) => (
         <label key={option.value}>

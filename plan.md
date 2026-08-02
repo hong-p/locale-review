@@ -346,7 +346,9 @@ GitHub patch 정보와 브라우저에서 계산한 라인 diff를 함께 사용
 ### 5.1 인증 방식
 
 - Fine-grained PAT와 classic PAT를 모두 허용한다.
-- UI와 문서에서는 Fine-grained PAT를 권장한다.
+- 자신이 소유한 저장소를 검토할 때는 Fine-grained PAT를 권장한다.
+- **본인 소유가 아닌 공개 저장소는 Fine-grained PAT로 쓰기가 불가능하다.** GitHub은 fine-grained 토큰에 대해 소유하지 않은 공개 저장소를 항상 읽기 전용으로 취급하므로, 권한을 어떻게 설정해도 댓글·리뷰·Viewed가 거부된다. 이 경우 `public_repo` 스코프를 가진 classic PAT만 동작한다.
+- 이 앱의 주 사용 사례가 남의 오픈소스 번역 PR 검토이므로, 토큰 안내에 두 경우를 모두 명시한다.
 - 토큰 생성 링크와 최소 권한 안내를 제공한다.
 - 권장 Fine-grained PAT 설정은 다음과 같다.
   - 검토할 저장소로 접근 범위 제한

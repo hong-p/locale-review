@@ -1,6 +1,8 @@
+/* Fills the diff area so the panels get the height rather than the page. */
 .viewer {
   display: flex;
   flex-direction: column;
+  flex: 1;
   gap: var(--space-3);
 }
 
@@ -31,8 +33,19 @@
   color: var(--color-fg-muted);
 }
 
+/*
+ * The panels have a height of their own rather than taking what is left.
+ *
+ * A definite height is what makes each panel scroll inside itself; with an
+ * automatic one the panels grow to the length of the file and the whole review
+ * body becomes one long scroll. It fills a tall window and never falls below
+ * the reading floor, so an outdated-comment block above the diff scrolls the
+ * body instead of squeezing the text being compared. The subtraction is the
+ * chrome above and below the panels: header, controls, file header, toolbar.
+ */
 .grid {
   display: grid;
+  height: max(var(--diff-panel-height), calc(100dvh - 19rem));
   gap: var(--space-3);
   /* The column count follows how many panels are visible; the custom property
      is the one runtime value plan.md 3.7 allows through inline style. */
@@ -67,4 +80,21 @@
   margin: 0;
   color: var(--color-fg-muted);
   font-size: var(--font-size-sm);
+}
+
+/* Each panel's slot in the grid. Flex so the panel stretches to the row. */
+.panelSlot {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+
+/*
+ * Declared after .panelSlot and with both classes, so hiding a panel on a
+ * narrow screen wins over the slot's own display.
+ */
+@media (max-width: 900px) {
+  .panelSlot.wideOnly {
+    display: none;
+  }
 }

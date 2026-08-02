@@ -129,7 +129,8 @@ const ERROR_MESSAGES = {
   invalidUrl: "That is not a valid GitHub pull request URL.",
   notFound: "That pull request could not be found, or your token cannot see it.",
   unauthorized: "Your GitHub token was rejected. Check that it is valid and has not expired.",
-  forbidden: "Your GitHub token does not have access to this repository.",
+  forbidden:
+    "Your GitHub token does not have access to this repository, or is not allowed to perform that action on it.",
   rateLimit: {
     primary: "The GitHub API rate limit has been exceeded.",
     secondary: "GitHub applied a secondary rate limit to this request.",

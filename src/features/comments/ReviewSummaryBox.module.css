@@ -1,0 +1,79 @@
+.box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.pending {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-muted);
+}
+
+.label {
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+}
+
+.textarea {
+  width: 100%;
+  min-height: 6rem;
+}
+
+.verdicts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.verdicts legend {
+  margin-bottom: var(--space-2);
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+}
+
+.verdict {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* plan.md 4.3's scope warning. Attention colour plus a border, never colour
+   alone (plan.md 7). */
+.warning {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-attention-fg);
+  border-radius: var(--radius-2);
+  background-color: var(--color-attention-subtle);
+  color: var(--color-fg);
+  font-size: var(--font-size-sm);
+}
+
+.warning p {
+  margin: 0;
+}
+
+.readOnly,
+.error {
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+
+.readOnly {
+  color: var(--color-fg-muted);
+}
+
+.error {
+  color: var(--color-danger-fg);
+}
+
+.submit {
+  align-self: flex-start;
+  background-color: var(--color-accent-emphasis);
+  border-color: var(--color-accent-emphasis);
+  color: var(--color-fg-on-emphasis);
+  font-weight: 600;
+}

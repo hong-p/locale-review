@@ -5,6 +5,7 @@ import type { PullRequestRef } from "../../api/types";
 import { messages } from "../../messages/en";
 import { useToken } from "../auth/TokenContext";
 import { type FreshnessSnapshot, fetchFreshness, hasChanged, onTabVisible } from "./freshness";
+import styles from "./RefreshBanner.module.css";
 
 /**
  * Manual refresh, and the banner that appears when GitHub moved on
@@ -41,10 +42,17 @@ export function RefreshBanner({ pullRequestRef, current, hasUnsentWork }: Refres
     });
   }, [client, pullRequestRef, current]);
 
+  const [refreshing, setRefreshing] = useState(false);
+
   const reload = () => {
     setStaleSince(false);
     setConfirming(false);
-    void queryClient.invalidateQueries();
+    setRefreshing(true);
+
+    // refetch, not invalidate: file contents are keyed by commit and marked
+    // permanently fresh, so invalidating alone would leave them untouched and
+    // the button would appear to do nothing.
+    void queryClient.refetchQueries({ type: "active" }).finally(() => setRefreshing(false));
   };
 
   const requestReload = () => {
@@ -57,9 +65,9 @@ export function RefreshBanner({ pullRequestRef, current, hasUnsentWork }: Refres
   };
 
   return (
-    <div>
+    <div className={styles.banner}>
       {staleSince && (
-        <p role="status">
+        <p role="status" className={styles.stale}>
           {messages.refresh.newChanges}{" "}
           <button type="button" onClick={requestReload}>
             {messages.refresh.reload}
@@ -67,19 +75,21 @@ export function RefreshBanner({ pullRequestRef, current, hasUnsentWork }: Refres
         </p>
       )}
 
-      <button type="button" onClick={requestReload}>
-        {messages.refresh.refresh}
+      <button type="button" onClick={requestReload} disabled={refreshing}>
+        {refreshing ? messages.refresh.refreshing : messages.refresh.refresh}
       </button>
 
       {confirming && (
-        <div role="alert">
+        <div role="alert" className={styles.confirm}>
           <p>{messages.refresh.unsentWarning}</p>
-          <button type="button" onClick={reload}>
-            {messages.refresh.reloadAnyway}
-          </button>
-          <button type="button" onClick={() => setConfirming(false)}>
-            {messages.refresh.keepEditing}
-          </button>
+          <div className={styles.confirmActions}>
+            <button type="button" onClick={reload}>
+              {messages.refresh.reloadAnyway}
+            </button>
+            <button type="button" onClick={() => setConfirming(false)}>
+              {messages.refresh.keepEditing}
+            </button>
+          </div>
         </div>
       )}
     </div>

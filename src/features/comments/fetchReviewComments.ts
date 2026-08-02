@@ -37,6 +37,23 @@ export type IssueComment = {
   htmlUrl: string;
 };
 
+/**
+ * A submitted review's summary body (plan.md 4.8).
+ *
+ * These are separate from issue comments: a review carries its own body next
+ * to a verdict, and GitHub shows both in one conversation. Fetching only issue
+ * comments left every "left a comment" review invisible.
+ */
+export type ReviewSummary = {
+  id: number;
+  author: GitHubUserRef | null;
+  submittedAt: string;
+  state: "COMMENTED" | "APPROVED" | "CHANGES_REQUESTED" | "DISMISSED";
+  body: string;
+  bodyHtml: string;
+  htmlUrl: string;
+};
+
 export type CommentThread = {
   rootId: number;
   path: string;
@@ -129,6 +146,62 @@ export async function fetchIssueComments(
   }
 
   return comments;
+}
+
+/**
+ * Submitted reviews that carry a summary body or a verdict.
+ *
+ * A review with neither is the envelope GitHub creates around inline comments
+ * and has nothing to show on its own, so it is dropped. A PENDING review is
+ * the viewer's own unsubmitted draft and is not part of the conversation.
+ */
+export async function fetchReviewSummaries(
+  client: GitHubClient,
+  ref: PullRequestRef,
+  signal?: AbortSignal,
+): Promise<ReviewSummary[]> {
+  const raw = await client.requestAllPages(
+    `/repos/${encodeURIComponent(ref.owner)}/${encodeURIComponent(ref.repository)}/pulls/${ref.number}/reviews`,
+    isRecordArray,
+    { signal, accept: "application/vnd.github.full+json" },
+  );
+
+  const reviews: ReviewSummary[] = [];
+  for (const item of raw) {
+    const id = typeof item.id === "number" ? item.id : null;
+    if (id === null) continue;
+
+    const state = toReviewState(item.state);
+    if (state === null) continue;
+
+    const body = asString(item.body) ?? "";
+    if (body === "" && state === "COMMENTED") continue;
+
+    reviews.push({
+      id,
+      author: toUser(item.user),
+      submittedAt: asString(item.submitted_at) ?? "",
+      state,
+      body,
+      bodyHtml: asString(item.body_html) ?? "",
+      htmlUrl: asString(item.html_url) ?? "",
+    });
+  }
+
+  return reviews;
+}
+
+function toReviewState(value: unknown): ReviewSummary["state"] | null {
+  switch (value) {
+    case "COMMENTED":
+    case "APPROVED":
+    case "CHANGES_REQUESTED":
+    case "DISMISSED":
+      return value;
+    // PENDING is the viewer's own unsubmitted draft, not conversation.
+    default:
+      return null;
+  }
 }
 
 /**

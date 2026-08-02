@@ -1,0 +1,74 @@
+.full,
+.compact {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.compact {
+  position: relative;
+}
+
+.row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.compact .row input {
+  width: 16ch;
+  font-size: var(--font-size-sm);
+  transition: width var(--duration-base);
+}
+
+/* Widens on focus so the header stays compact until it is being used. */
+.compact .row input:focus {
+  width: 32ch;
+}
+
+.label {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.submit {
+  background-color: var(--color-accent-emphasis);
+  border-color: var(--color-accent-emphasis);
+  color: var(--color-fg-on-emphasis);
+  font-weight: 600;
+}
+
+.error {
+  margin: 0;
+  color: var(--color-danger-fg);
+  font-size: var(--font-size-sm);
+}
+
+/* The compact form's error would push the header around, so it floats. */
+.compact .error {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 2;
+  max-width: 28rem;
+  margin-top: var(--space-1);
+  padding: var(--space-2);
+  border: var(--border-width) solid var(--color-danger-fg);
+  border-radius: var(--radius-2);
+  background-color: var(--color-canvas);
+  box-shadow: var(--shadow-2);
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

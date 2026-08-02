@@ -57,9 +57,12 @@ const isRepositoryPayload = (value: unknown): value is RepositoryPayload =>
   typeof value === "object" && value !== null;
 
 /**
- * `permissions` is present only on an authenticated request and describes what
- * the caller may do. Absent means the caller is anonymous, which this app never
- * is, or that GitHub omitted it — either way, assume read only.
+ * Whether the caller can push code to the repository.
+ *
+ * This is NOT what gates reviewing. GitHub lets anyone with read access
+ * comment on, approve, and request changes to a pull request, and Viewed is a
+ * per-user state that only needs read. Push access is reported because it is
+ * worth showing, not because the review surface depends on it.
  */
 function readPushPermission(payload: RepositoryPayload): boolean {
   const { permissions } = payload;
@@ -115,14 +118,20 @@ export async function checkRepositoryAccess(
       { signal },
     );
 
-    const canWrite = readPushPermission(payload);
+    // Reaching the repository at all means read access, and read access is
+    // enough to review: GitHub allows commenting, approving, and requesting
+    // changes without push, which is how open-source review works. Viewed is a
+    // per-user state on the same footing.
+    //
+    // Whether the *token* was granted Pull requests: write cannot be read
+    // ahead of time for a fine-grained token, so the surface stays available
+    // and a refused write reports itself (plan.md 10 forbids the reverse:
+    // presenting a failure as success).
     return {
       state: "accessible",
       isPrivate: payload.private === true,
-      canWrite,
-      capabilities: canWrite
-        ? ["read", "comment", "review", "viewed"]
-        : [...READ_ONLY_CAPABILITIES],
+      canWrite: readPushPermission(payload),
+      capabilities: ["read", "comment", "review", "viewed"],
     };
   } catch (error) {
     const apiError = asGitHubApiError(error);

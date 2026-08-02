@@ -1,11 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { PullRequestDiffBase, PullRequestRef } from "../../api/types";
 import { messages } from "../../messages/en";
-import { CommentThreadView } from "../comments/CommentThreadView";
-import { ReviewSummaryBox } from "../comments/ReviewSummaryBox";
-import { useCommentActions, useReviewComments } from "../comments/useReviewComments";
 import { threadsForFile } from "../comments/fetchReviewComments";
+import type { CommentActions } from "../comments/useReviewComments";
+import { useReviewComments } from "../comments/useReviewComments";
 import { ThreeColumnDiff } from "../diff/ThreeColumnDiff";
 import {
   filterFilesByLocale,
@@ -15,17 +14,22 @@ import {
   unreviewedLocales,
 } from "../locales/localeFilter";
 import { DEFAULT_LAYOUT } from "../settings/translationLayout";
-import { FileSidebar } from "./FileSidebar";
-import { buildTranslationFileModel } from "./translationFileModel";
-import type { FileContent } from "./fetchFileContent";
-import { ViewedToggle } from "../viewed/ViewedToggle";
 import { useViewedState } from "../viewed/useViewedState";
+import type { FileContent } from "./fetchFileContent";
+import { FileControls } from "./FileControls";
+import { FileHeader } from "./FileHeader";
+import layout from "./ReviewLayout.module.css";
+import { buildTranslationFileModel } from "./translationFileModel";
 import { useChangedFiles, useFileVersions } from "./useFileVersions";
+import { ViewedToggle } from "../viewed/ViewedToggle";
 
 /**
- * The review surface: file list, locale filter, three-column diff, Viewed,
- * existing conversations, and review submission
+ * The review surface: file selection, locale filter, three-column diff, Viewed,
+ * and the conversations anchored inside the diff
  * (plan.md 4.2, 4.3, 4.6, 4.7, 4.8, 4.9).
+ *
+ * The review form itself lives in the header, so the write actions are created
+ * by the screen and passed in rather than being made here and handed upward.
  */
 
 export type TranslationFileBrowserProps = {
@@ -33,18 +37,19 @@ export type TranslationFileBrowserProps = {
   diffBase: PullRequestDiffBase;
   /** Whether this token may write; every write surface follows it (plan.md 4.9). */
   canWrite: boolean;
-  viewerLogin: string | null;
-  reviewBody: string;
-  onReviewBodyChange: (body: string) => void;
+  actions: CommentActions;
+  readOnlyNotice: boolean;
+  /** Reports locales the filter hides, so the review form can warn (plan.md 4.3). */
+  onLocaleScopeChange: (locales: readonly string[]) => void;
 };
 
 export function TranslationFileBrowser({
   pullRequestRef,
   diffBase,
   canWrite,
-  viewerLogin,
-  reviewBody,
-  onReviewBodyChange,
+  actions,
+  readOnlyNotice,
+  onLocaleScopeChange,
 }: TranslationFileBrowserProps) {
   const changed = useChangedFiles(pullRequestRef);
 
@@ -77,7 +82,6 @@ export function TranslationFileBrowser({
   const versions = useFileVersions(selectedFile, diffBase);
   const viewed = useViewedState(pullRequestRef, canWrite);
   const conversations = useReviewComments(pullRequestRef);
-  const actions = useCommentActions(pullRequestRef, diffBase.headSha, viewerLogin, canWrite);
 
   // The patch stays on the raw changed file rather than the model, since only
   // the viewer and the comment layer need it.
@@ -88,12 +92,21 @@ export function TranslationFileBrowser({
     ? threadsForFile(conversations.data?.threads ?? [], selectedFile.id)
     : [];
 
+  // Reported as a joined string so the effect fires on a real change rather
+  // than on every render, which a fresh array identity would cause.
+  const hiddenLocales = model ? unreviewedLocales(model.locales, locales) : [];
+  const hiddenKey = hiddenLocales.join(",");
+
+  useEffect(() => {
+    onLocaleScopeChange(hiddenKey === "" ? [] : hiddenKey.split(","));
+  }, [onLocaleScopeChange, hiddenKey]);
+
   if (changed.isPending) return <p role="status">{messages.pullRequest.loading}</p>;
   if (!model) return null;
 
   if (model.files.length === 0) {
     return (
-      <section>
+      <section className={layout.notices}>
         <h2>{messages.files.noTranslationsTitle}</h2>
         <p>{messages.files.noTranslationsBody}</p>
         <p>
@@ -104,87 +117,100 @@ export function TranslationFileBrowser({
     );
   }
 
-  return (
-    <section>
-      {changed.data?.truncated && <p role="alert">{messages.files.truncated}</p>}
-      {model.ambiguous.length > 0 && (
-        <p role="alert">
-          {messages.files.ambiguous} {model.ambiguous.join(", ")}
-        </p>
-      )}
-      {autoSelection?.needsChoice && selectedLocales === null && (
-        <p role="status">{messages.files.chooseLocale}</p>
-      )}
+  const viewedCount = visibleFiles.filter((file) => viewed.states.get(file.id) === "VIEWED").length;
 
-      <FileSidebar
+  return (
+    <div className={layout.body}>
+      <FileControls
         files={visibleFiles}
         locales={model.locales}
         selectedLocales={locales}
         hiddenCount={hiddenFileCount(model.files, locales)}
         selectedFileId={selectedFile?.id ?? null}
+        viewedCount={viewedCount}
         onToggleLocale={(locale) => setSelectedLocales(toggleLocale(locales, locale))}
         onSelectFile={setSelectedFileId}
       />
 
-      {selectedFile && (
-        <article aria-label={selectedFile.id}>
-          <h2>{selectedFile.id}</h2>
-          {selectedFile.previousPath !== null && (
-            <p>
-              {messages.files.renamedFrom} {selectedFile.previousPath}
-            </p>
+      {(readOnlyNotice ||
+        changed.data?.truncated ||
+        model.ambiguous.length > 0 ||
+        (autoSelection?.needsChoice && selectedLocales === null)) && (
+        <div className={layout.notices}>
+          {readOnlyNotice && <Notice tone="info">{messages.pullRequest.readOnlyBody}</Notice>}
+          {changed.data?.truncated && <Notice tone="warn">{messages.files.truncated}</Notice>}
+          {model.ambiguous.length > 0 && (
+            <Notice tone="warn">
+              {messages.files.ambiguous} {model.ambiguous.join(", ")}
+            </Notice>
           )}
-          {versions.isLoading ? (
-            <p role="status">{messages.files.loadingContent}</p>
-          ) : (
-            <ThreeColumnDiff
-              sourceText={contentText(versions.source)}
-              beforeText={contentText(versions.before) ?? ""}
-              afterText={contentText(versions.after) ?? ""}
-              sourceLocale={DEFAULT_LAYOUT.sourceLocale}
-              targetLocale={selectedFile.locale}
-              patch={selectedFilePatch}
-              sourceMissing={selectedFile.source === null || versions.source?.state === "absent"}
-            />
+          {autoSelection?.needsChoice && selectedLocales === null && (
+            <Notice tone="info">{messages.files.chooseLocale}</Notice>
           )}
-          {!selectedFile.canComment && <p>{messages.files.noPatch}</p>}
-
-          <ViewedToggle
-            path={selectedFile.id}
-            controller={viewed}
-            visiblePaths={visibleFiles.map((file) => file.id)}
-          />
-
-          <section aria-label={messages.comments.heading}>
-            <h3>{messages.comments.heading}</h3>
-            {fileThreads.length === 0 ? (
-              <p>{messages.comments.none}</p>
-            ) : (
-              fileThreads.map((thread) => (
-                <CommentThreadView
-                  key={thread.rootId}
-                  thread={thread}
-                  canReply={canWrite}
-                  isBusy={actions.isBusy}
-                  onReply={actions.reply}
-                />
-              ))
-            )}
-          </section>
-        </article>
+        </div>
       )}
 
-      <ReviewSummaryBox
-        canSubmit={canWrite}
-        isBusy={actions.isBusy}
-        // plan.md 4.3: a verdict covers locales the filter is hiding too.
-        unreviewedLocales={unreviewedLocales(model.locales, locales)}
-        pendingCommentCount={0}
-        body={reviewBody}
-        onBodyChange={onReviewBodyChange}
-        onSubmit={actions.submit}
-      />
-    </section>
+      {selectedFile ? (
+        <div className={layout.scrollArea}>
+          <FileHeader
+            file={selectedFile}
+            viewed={<ViewedToggle path={selectedFile.id} controller={viewed} />}
+          />
+
+          <div className={layout.diffArea}>
+            {versions.isLoading ? (
+              <p role="status">{messages.files.loadingContent}</p>
+            ) : (
+              <ThreeColumnDiff
+                sourceText={contentText(versions.source)}
+                beforeText={contentText(versions.before) ?? ""}
+                afterText={contentText(versions.after) ?? ""}
+                sourceLocale={DEFAULT_LAYOUT.sourceLocale}
+                targetLocale={selectedFile.locale}
+                patch={selectedFilePatch}
+                sourceMissing={selectedFile.source === null || versions.source?.state === "absent"}
+                threads={fileThreads}
+                comments={{
+                  onReply: canWrite ? actions.reply : null,
+                  onCreate: canWrite
+                    ? (line, body, immediate, startLine) => {
+                        const comment = {
+                          path: selectedFile.id,
+                          line,
+                          side: "RIGHT" as const,
+                          body,
+                          // plan.md 4.9: a range carries both ends and both sides.
+                          ...(startLine === undefined
+                            ? {}
+                            : { startLine, startSide: "RIGHT" as const }),
+                        };
+                        return immediate ? actions.postNow(comment) : actions.addToPending(comment);
+                      }
+                    : null,
+                  isBusy: actions.isBusy,
+                }}
+              />
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className={layout.notices}>
+          <Notice tone="info">{messages.files.noneSelected}</Notice>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** A short status or warning line, coloured but never colour alone (plan.md 7). */
+function Notice({ tone, children }: { tone: "info" | "warn"; children: React.ReactNode }) {
+  return (
+    <p
+      className={tone === "warn" ? layout.warnNotice : layout.infoNotice}
+      role={tone === "warn" ? "alert" : "status"}
+    >
+      {children}
+    </p>
   );
 }
 

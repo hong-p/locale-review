@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useId, useRef, useState } from "react";
 
 import { messages } from "../../messages/en";
 import type { CommentThread } from "./fetchReviewComments";
+import styles from "./CommentThreadView.module.css";
+import { MarkdownToolbar } from "./MarkdownToolbar";
 import { sanitizeCommentHtml } from "./sanitizeCommentHtml";
+import { writeFailureMessage } from "./writeFailureMessage";
 
 /**
  * One existing conversation (plan.md 4.8).
@@ -21,6 +24,8 @@ export type CommentThreadViewProps = {
 export function CommentThreadView({ thread, canReply, isBusy, onReply }: CommentThreadViewProps) {
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const textarea = useRef<HTMLTextAreaElement | null>(null);
+  const replyId = useId();
 
   const submit = async () => {
     if (draft.trim() === "") return;
@@ -29,34 +34,44 @@ export function CommentThreadView({ thread, canReply, isBusy, onReply }: Comment
       // plan.md 4.9: clear only after the write is confirmed.
       setDraft("");
       setError(null);
-    } catch {
-      setError(messages.comments.replyFailed);
+    } catch (failure) {
+      setError(writeFailureMessage(failure, messages.comments.replyFailed));
     }
   };
 
   return (
-    <section aria-label={`${messages.comments.threadOn} ${thread.path}`}>
-      <header>
+    <section className={styles.thread} aria-label={`${messages.comments.threadOn} ${thread.path}`}>
+      <header className={styles.threadHeader}>
         <span>
           {thread.path}
           {thread.line !== null && `:${thread.line}`}
         </span>
         {/* plan.md 4.8: outdated is stated in words, not implied by styling. */}
-        {thread.outdated && <span>{messages.comments.outdated}</span>}
+        {thread.outdated && <span className={styles.outdated}>{messages.comments.outdated}</span>}
       </header>
 
-      <ol>
+      <ol className={styles.comments}>
         {thread.comments.map((comment) => (
           <li key={comment.id}>
             <article>
-              <header>
-                <span>{comment.author?.login ?? messages.pullRequest.authorUnknown}</span>
-                <time dateTime={comment.createdAt}>{formatTime(comment.createdAt)}</time>
-                <a href={comment.htmlUrl} target="_blank" rel="noreferrer noopener">
+              <header className={styles.commentHeader}>
+                <span className={styles.author}>
+                  {comment.author?.login ?? messages.pullRequest.authorUnknown}
+                </span>
+                <time className={styles.time} dateTime={comment.createdAt}>
+                  {formatTime(comment.createdAt)}
+                </time>
+                <a
+                  className={styles.link}
+                  href={comment.htmlUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                >
                   {messages.comments.viewOnGitHub}
                 </a>
               </header>
               <div
+                className={styles.body}
                 // The only dangerouslySetInnerHTML in the app. The value comes
                 // from GitHub and is re-sanitised on the line above.
                 // biome-ignore lint/security/noDangerouslySetInnerHtml: sanitised through the audited path required by plan.md 4.8.
@@ -69,22 +84,39 @@ export function CommentThreadView({ thread, canReply, isBusy, onReply }: Comment
 
       {canReply ? (
         <form
+          className={styles.replyForm}
           onSubmit={(event) => {
             event.preventDefault();
             void submit();
           }}
         >
-          <label>
+          <label className={styles.replyLabel} htmlFor={replyId}>
             {messages.comments.replyLabel}
-            <textarea value={draft} onChange={(event) => setDraft(event.target.value)} rows={3} />
           </label>
+          <MarkdownToolbar
+            textarea={textarea}
+            value={draft}
+            onChange={setDraft}
+            disabled={isBusy}
+          />
+          <textarea
+            id={replyId}
+            ref={textarea}
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            rows={3}
+          />
           <button type="submit" disabled={isBusy || draft.trim() === ""}>
             {isBusy ? messages.comments.sending : messages.comments.reply}
           </button>
-          {error !== null && <p role="alert">{error}</p>}
+          {error !== null && (
+            <p role="alert" className={styles.error}>
+              {error}
+            </p>
+          )}
         </form>
       ) : (
-        <p>{messages.comments.replyUnavailable}</p>
+        <p className={styles.unavailable}>{messages.comments.replyUnavailable}</p>
       )}
     </section>
   );
