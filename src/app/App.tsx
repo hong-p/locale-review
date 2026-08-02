@@ -3,6 +3,7 @@ import { HashRouter } from "react-router";
 
 import { TokenProvider } from "../features/auth/TokenContext";
 import { ThemeProvider } from "../features/settings/theme";
+import { TranslationSettingsProvider } from "../features/settings/TranslationSettingsContext";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { AppRoutes } from "./routes";
 
@@ -32,11 +33,13 @@ export function App() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
-          <TokenProvider>
-            <HashRouter>
-              <AppRoutes />
-            </HashRouter>
-          </TokenProvider>
+          <TranslationSettingsProvider>
+            <TokenProvider>
+              <HashRouter>
+                <AppRoutes />
+              </HashRouter>
+            </TokenProvider>
+          </TranslationSettingsProvider>
         </ThemeProvider>
       </QueryClientProvider>
     </ErrorBoundary>

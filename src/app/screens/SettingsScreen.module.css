@@ -1,0 +1,122 @@
+/*
+ * The settings screen (plan.md 4.2, 7).
+ *
+ * Same single-column card layout as the start screen: it is a form read top to
+ * bottom, and nothing here benefits from competing for horizontal space.
+ */
+
+.page {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.masthead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-xl);
+}
+
+.intro {
+  margin: var(--space-1) 0 0;
+  max-width: 34rem;
+  color: var(--color-fg-muted);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-3);
+  background-color: var(--color-canvas);
+  box-shadow: var(--shadow-1);
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: var(--font-size-lg);
+}
+
+.field,
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.label {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  padding: 0;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.hint {
+  margin: 0;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-sm);
+}
+
+/*
+ * The worked example. It restates the settings as the path pair they produce,
+ * so the source lookup can be checked without opening a pull request.
+ */
+.example {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-2);
+  background-color: var(--color-canvas-subtle);
+}
+
+.examplePath {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  /* Long roots wrap rather than pushing the card sideways. */
+  overflow-wrap: anywhere;
+}
+
+.examplePath code {
+  font-family: var(--font-mono);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.submit {
+  background-color: var(--color-accent-emphasis);
+  border-color: var(--color-accent-emphasis);
+  color: var(--color-fg-on-emphasis);
+  font-weight: 600;
+}
+
+.status {
+  margin: 0;
+  color: var(--color-success-fg);
+  font-size: var(--font-size-sm);
+}

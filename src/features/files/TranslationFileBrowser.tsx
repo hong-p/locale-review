@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router";
 
+import { ROUTE_SETTINGS } from "../../app/routes";
 import type { PullRequestDiffBase, PullRequestRef } from "../../api/types";
 import { messages } from "../../messages/en";
 import { threadsForFile } from "../comments/fetchReviewComments";
@@ -13,7 +15,8 @@ import {
   toggleLocale,
   unreviewedLocales,
 } from "../locales/localeFilter";
-import { DEFAULT_LAYOUT } from "../settings/translationLayout";
+import { useTranslationSettings } from "../settings/TranslationSettingsContext";
+import { formatExtensionList, toLayoutSettings } from "../settings/translationSettings";
 import { useViewedState } from "../viewed/useViewedState";
 import type { FileContent } from "./fetchFileContent";
 import { FileControls } from "./FileControls";
@@ -52,16 +55,21 @@ export function TranslationFileBrowser({
   onLocaleScopeChange,
 }: TranslationFileBrowserProps) {
   const changed = useChangedFiles(pullRequestRef);
+  // plan.md 4.2: which files are translations, and where each one's source
+  // lives, is the reviewer's setting rather than a constant in the code.
+  const { settings } = useTranslationSettings();
 
   const model = useMemo(
     () =>
       changed.data
         ? buildTranslationFileModel(changed.data.files, {
-            settings: DEFAULT_LAYOUT,
+            settings: toLayoutSettings(settings),
             diffBase,
+            activeLayouts: settings.layouts,
+            knownLocales: settings.preferredLocales,
           })
         : null,
-    [changed.data, diffBase],
+    [changed.data, diffBase, settings],
   );
 
   // Null until the model arrives, so the automatic selection runs once against
@@ -70,8 +78,8 @@ export function TranslationFileBrowser({
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
 
   const autoSelection = useMemo(
-    () => (model ? initialLocaleSelection(model.locales, DEFAULT_PREFERRED) : null),
-    [model],
+    () => (model ? initialLocaleSelection(model.locales, settings.preferredLocales) : null),
+    [model, settings.preferredLocales],
   );
 
   const locales = selectedLocales ?? autoSelection?.selected ?? [];
@@ -104,14 +112,28 @@ export function TranslationFileBrowser({
   if (changed.isPending) return <p role="status">{messages.pullRequest.loading}</p>;
   if (!model) return null;
 
+  // plan.md 4.2: the settings that found nothing are stated, and both ways out
+  // — change them, or ask GitHub again — are offered here.
   if (model.files.length === 0) {
+    const root = settings.contentRoot === "" ? "" : `${settings.contentRoot}/`;
     return (
       <section className={layout.notices}>
         <h2>{messages.files.noTranslationsTitle}</h2>
         <p>{messages.files.noTranslationsBody}</p>
         <p>
-          {messages.files.activeLayout}: {DEFAULT_LAYOUT.kind} · {DEFAULT_LAYOUT.contentRoot}/
-          {"{locale}"} · {DEFAULT_LAYOUT.extensions.join(", ")}
+          {messages.files.activeLayout}: {settings.layouts.join(", ")} · {root}
+          {"{locale}"} · {formatExtensionList(settings.extensions)}
+        </p>
+        <p>
+          {messages.files.activeSource}: {settings.sourceLocale}
+        </p>
+        <p>
+          <Link to={ROUTE_SETTINGS}>{messages.files.changeLayout}</Link>
+        </p>
+        <p>
+          <button type="button" onClick={() => void changed.refetch()}>
+            {messages.files.retry}
+          </button>
         </p>
       </section>
     );
@@ -165,7 +187,7 @@ export function TranslationFileBrowser({
                 sourceText={contentText(versions.source)}
                 beforeText={contentText(versions.before) ?? ""}
                 afterText={contentText(versions.after) ?? ""}
-                sourceLocale={DEFAULT_LAYOUT.sourceLocale}
+                sourceLocale={settings.sourceLocale}
                 targetLocale={selectedFile.locale}
                 patch={selectedFilePatch}
                 sourceMissing={selectedFile.source === null || versions.source?.state === "absent"}
@@ -213,9 +235,6 @@ function Notice({ tone, children }: { tone: "info" | "warn"; children: React.Rea
     </p>
   );
 }
-
-/** plan.md 4.3's default preferred locale, until settings expose it in the UI. */
-const DEFAULT_PREFERRED = ["ko"] as const;
 
 /** A version that is absent or unsupported renders as an empty panel. */
 function contentText(content: FileContent | undefined): string | null {

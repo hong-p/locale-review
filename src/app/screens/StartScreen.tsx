@@ -1,7 +1,10 @@
+import { Link } from "react-router";
+
 import { TokenPanel } from "../../features/auth/TokenPanel";
 import { useToken } from "../../features/auth/TokenContext";
 import { messages } from "../../messages/en";
 import { OpenPullRequestField } from "../../features/pull/OpenPullRequestField";
+import { ROUTE_SETTINGS } from "../routes";
 import { ThemeToggle } from "../ThemeToggle";
 import styles from "./StartScreen.module.css";
 
@@ -23,7 +26,12 @@ export function StartScreen() {
           <h1 className={styles.title}>{messages.app.name}</h1>
           <p className={styles.tagline}>{messages.app.tagline}</p>
         </div>
-        <ThemeToggle />
+        {/* plan.md 7: the start screen carries the way into settings, which is
+            where the translation layout and the source locale are decided. */}
+        <div className={styles.mastheadActions}>
+          <Link to={ROUTE_SETTINGS}>{messages.settings.open}</Link>
+          <ThemeToggle />
+        </div>
       </header>
 
       <section className={styles.card} aria-labelledby="start-heading">

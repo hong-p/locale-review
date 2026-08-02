@@ -18,7 +18,7 @@ import { ConversationPopover } from "../../features/comments/ConversationPopover
 import { ReviewPopover } from "../../features/comments/ReviewPopover";
 import { useCommentActions, useReviewComments } from "../../features/comments/useReviewComments";
 import shell from "../AppShell.module.css";
-import { ROUTE_START } from "../routes";
+import { ROUTE_SETTINGS, ROUTE_START } from "../routes";
 
 /**
  * plan.md 7's pull request header, and every distinct load failure plan.md 4.1
@@ -243,6 +243,8 @@ function PullRequestHeader({
         <a href={summary.htmlUrl} target="_blank" rel="noreferrer noopener">
           {messages.pullRequest.openOnGitHub}
         </a>
+        {/* Its own route, so Back returns to this pull request (plan.md 3.3). */}
+        <Link to={ROUTE_SETTINGS}>{messages.settings.open}</Link>
         <button type="button" onClick={onOpenConversation}>
           {messages.comments.openConversation}
           {conversationCount > 0 && ` (${conversationCount})`}

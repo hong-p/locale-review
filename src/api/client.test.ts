@@ -403,10 +403,9 @@ describe("GraphQL error classification", () => {
     const error = await captureError(() => client().graphql("mutation {}", {}, isData));
 
     expect(error?.code).toBe("permission-denied");
-    // The wording has to name both cases: a fine-grained token needs Pull
-    // requests write on your own repository, and cannot write at all to one
-    // you do not own, where only a classic token works.
-    expect(error?.message).toMatch(/pull requests: read and write/i);
+    // The wording has to name the token that would work, since the one the
+    // reviewer is most likely holding never can.
+    expect(error?.message).toMatch(/classic token/i);
     expect(error?.message).toMatch(/public_repo/i);
   });
 

@@ -7,9 +7,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TokenProvider } from "../../features/auth/TokenContext";
 import { ThemeProvider } from "../../features/settings/theme";
+import { TranslationSettingsProvider } from "../../features/settings/TranslationSettingsContext";
 import { server } from "../../test/msw/server";
-import { ROUTE_PULL_REQUEST, ROUTE_START } from "../routes";
+import { ROUTE_PULL_REQUEST, ROUTE_SETTINGS, ROUTE_START } from "../routes";
 import { PullRequestScreen } from "./PullRequestScreen";
+import { SettingsScreen } from "./SettingsScreen";
 import { StartScreen } from "./StartScreen";
 
 const ORIGIN = "https://api.github.com";
@@ -28,14 +30,17 @@ function renderApp(initialPath: string) {
   return render(
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <TokenProvider>
-          <MemoryRouter initialEntries={[initialPath]}>
-            <Routes>
-              <Route path={ROUTE_START} element={<StartScreen />} />
-              <Route path={ROUTE_PULL_REQUEST} element={<PullRequestScreen />} />
-            </Routes>
-          </MemoryRouter>
-        </TokenProvider>
+        <TranslationSettingsProvider>
+          <TokenProvider>
+            <MemoryRouter initialEntries={[initialPath]}>
+              <Routes>
+                <Route path={ROUTE_START} element={<StartScreen />} />
+                <Route path={ROUTE_SETTINGS} element={<SettingsScreen />} />
+                <Route path={ROUTE_PULL_REQUEST} element={<PullRequestScreen />} />
+              </Routes>
+            </MemoryRouter>
+          </TokenProvider>
+        </TranslationSettingsProvider>
       </ThemeProvider>
     </QueryClientProvider>,
   );
@@ -182,6 +187,21 @@ describe("token panel", () => {
     expect(screen.queryByRole("button", { name: /test connection/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /clear token/i })).toBeNull();
     expect(screen.getByText(/no token set/i)).toBeVisible();
+  });
+
+  it("points at a classic token and at nothing else", () => {
+    // plan.md 5.1: a fine-grained token cannot write to a repository the user
+    // does not own, which is most of what this app is for, so offering one as
+    // an option only invited the token that fails.
+    renderApp(ROUTE_START);
+
+    expect(screen.getByRole("link", { name: /create a classic token/i })).toHaveAttribute(
+      "href",
+      expect.stringContaining("scopes=public_repo"),
+    );
+    expect(screen.queryByRole("link", { name: /fine-grained/i })).toBeNull();
+    // The reason is still stated, so a rejected fine-grained token makes sense.
+    expect(screen.getByText(/fine-grained token will not do/i)).toBeVisible();
   });
 
   it("moves the token between stores when remember is toggled", async () => {

@@ -8,9 +8,12 @@ import type { PullRequestDiffBase } from "../../api/types";
 import { server } from "../../test/msw/server";
 import { useState } from "react";
 
+import { MemoryRouter } from "react-router";
+
 import { ReviewPopover } from "../comments/ReviewPopover";
 import { useCommentActions } from "../comments/useReviewComments";
 import { TokenProvider } from "../auth/TokenContext";
+import { TranslationSettingsProvider } from "../settings/TranslationSettingsContext";
 import { TranslationFileBrowser } from "./TranslationFileBrowser";
 
 /**
@@ -118,9 +121,13 @@ function renderSurface(canWrite: boolean) {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <TokenProvider>
-        <Surface canWrite={canWrite} />
-      </TokenProvider>
+      <TranslationSettingsProvider>
+        <TokenProvider>
+          <MemoryRouter>
+            <Surface canWrite={canWrite} />
+          </MemoryRouter>
+        </TokenProvider>
+      </TranslationSettingsProvider>
     </QueryClientProvider>,
   );
 }

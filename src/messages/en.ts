@@ -21,7 +21,7 @@ export const messages = {
   token: {
     heading: "GitHub token",
     label: "Personal access token",
-    placeholder: "github_pat_… or ghp_…",
+    placeholder: "ghp_…",
     save: "Save token",
     clear: "Clear token",
     test: "Test connection",
@@ -30,15 +30,14 @@ export const messages = {
     rememberHint:
       "Off by default, the token is kept only for this browser tab. Turning this on stores it on this device — avoid it on a shared computer.",
     guidance:
-      "For your own repositories: a fine-grained token limited to those repositories, with Contents read-only and Pull requests read and write.",
-    guidanceThirdParty:
-      "To review someone else's public repository, use a classic token with the public_repo scope. A fine-grained token is always read-only on repositories you do not own, so it can display a pull request but cannot comment, review, or mark files viewed.",
-    createLink: "Create a fine-grained token",
+      "Use a classic token with the public_repo scope. Give it a short expiry, and add the repo scope only if you also review private repositories.",
+    guidanceFineGrained:
+      "A fine-grained token will not do. GitHub keeps one read-only on every repository you do not own, whatever it is granted, so a pull request would display but no comment, review, or Viewed mark would be accepted.",
     createClassicLink: "Create a classic token",
     signedInAs: "Signed in as",
     testPassed: "Connection verified. GitHub accepted this token for",
     repositoryScope:
-      "Whether it can read or write a particular repository is reported when you open a pull request there.",
+      "This checks the token, not what it may do: GitHub only says whether a write is allowed when one is actually sent.",
     connectionFailed: "That token could not be used.",
     notSet: "No token set",
   },
@@ -70,6 +69,9 @@ export const messages = {
     noTranslationsBody:
       "None of the changed files match the active translation layout. Adjust the layout in settings and try again.",
     activeLayout: "Active layout",
+    activeSource: "Source locale",
+    changeLayout: "Change the layout in settings",
+    retry: "Try again",
     chooseLocale: "This pull request contains no preferred locale. Choose which to review.",
     truncated: "GitHub returned only the first 3,000 changed files, so this list is incomplete.",
     ambiguous: "These paths match more than one layout rule and need a choice:",
@@ -184,10 +186,10 @@ export const messages = {
     tokenRejectedBody:
       "GitHub did not accept the token. It may be expired, revoked, or mistyped. Set it again on the start screen.",
     writeForbiddenBody:
-      "GitHub accepted the token but refused to write. On your own repositories a fine-grained token needs Pull requests: Read and write. On a public repository owned by someone else a fine-grained token is read-only whatever it is granted, and only a classic token with the public_repo scope can write there.",
+      "GitHub accepted the token but refused to write. Commenting and reviewing need a classic token with the public_repo scope; a fine-grained token cannot write here.",
     permissionTitle: "This token cannot see that repository",
     permissionBody:
-      "GitHub accepted the token but refused this repository. A fine-grained token only reaches the repositories it was granted; check its repository access. For a public repository owned by someone else, a classic token with the public_repo scope is the one that also allows reviewing.",
+      "GitHub accepted the token but refused this repository. Reviewing needs a classic token with the public_repo scope, or the repo scope if the repository is private.",
     rateLimitTitle: "GitHub rate limit reached",
     rateLimitBody: "No further requests will succeed until the limit resets.",
     rateLimitResetsAt: "Resets at",
@@ -198,10 +200,41 @@ export const messages = {
   },
   settings: {
     title: "Settings",
+    open: "Settings",
+    intro:
+      "These rules decide which changed files are translations, and where the app looks for the source file each one was translated from.",
     theme: "Theme",
     themeLight: "Light",
     themeDark: "Dark",
     themeSystem: "System",
+    layoutHeading: "Translation layout",
+    layoutLegend: "Layouts to detect",
+    layoutLocaleDirectory: "Locale directory — content/{locale}/guide.md",
+    layoutFilenameSuffix: "Filename suffix — content/guide.{locale}.md",
+    layoutHint: "Both can be on at once. A path matching both is reported instead of guessed.",
+    sourceLocaleLabel: "Source locale",
+    sourceLocaleHint:
+      "The language translations are made from. Its files are shown as the source, never as a translation to review.",
+    contentRootLabel: "Content root",
+    contentRootHint:
+      "The directory translations live under, for example content. Leave it empty to search the whole repository.",
+    contentRootPlaceholder: "content",
+    extensionsLabel: "File extensions",
+    extensionsHint: "Comma separated. A missing dot is added for you.",
+    extensionsPlaceholder: ".md, .mdx",
+    sourceSuffixLabel: "Source files carry the locale suffix",
+    sourceSuffixHint:
+      "Turn this off for Hugo's default language, where guide.ko.md pairs with guide.md rather than guide.en.md.",
+    preferredLabel: "Preferred locales",
+    preferredHint:
+      "Selected automatically when a pull request contains them, and treated as locales even if they do not look like a language tag. Comma separated.",
+    preferredPlaceholder: "ko",
+    exampleHeading: "Where the source is looked up",
+    exampleNone: "These settings do not match the path they describe.",
+    save: "Save settings",
+    saved: "Settings saved.",
+    reset: "Reset to defaults",
+    resetDone: "Settings restored to their defaults.",
   },
   errors: {
     unexpectedTitle: "Something went wrong",

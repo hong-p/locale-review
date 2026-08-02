@@ -2,6 +2,7 @@ import { Link, Route, Routes } from "react-router";
 
 import { messages } from "../messages/en";
 import { PullRequestScreen } from "./screens/PullRequestScreen";
+import { SettingsScreen } from "./screens/SettingsScreen";
 import { StartScreen } from "./screens/StartScreen";
 
 /**
@@ -10,6 +11,7 @@ import { StartScreen } from "./screens/StartScreen";
  * links already shared.
  */
 export const ROUTE_START = "/";
+export const ROUTE_SETTINGS = "/settings";
 export const ROUTE_PULL_REQUEST = "/github/:owner/:repo/pull/:number";
 
 export function pullRequestPath(owner: string, repo: string, number: number | string): string {
@@ -30,6 +32,7 @@ export function AppRoutes() {
   return (
     <Routes>
       <Route path={ROUTE_START} element={<StartScreen />} />
+      <Route path={ROUTE_SETTINGS} element={<SettingsScreen />} />
       <Route path={ROUTE_PULL_REQUEST} element={<PullRequestScreen />} />
       <Route path="*" element={<NotFoundScreen />} />
     </Routes>

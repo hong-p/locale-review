@@ -5,7 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TokenProvider } from "../features/auth/TokenContext";
 import { ThemeProvider } from "../features/settings/theme";
-import { AppRoutes, pullRequestPath } from "./routes";
+import { TranslationSettingsProvider } from "../features/settings/TranslationSettingsContext";
+import { AppRoutes, pullRequestPath, ROUTE_SETTINGS } from "./routes";
 
 /**
  * Mirrors the provider stack in App.tsx. These tests cover routing only, so no
@@ -19,11 +20,13 @@ function renderAt(path: string) {
   return render(
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <TokenProvider>
-          <MemoryRouter initialEntries={[path]}>
-            <AppRoutes />
-          </MemoryRouter>
-        </TokenProvider>
+        <TranslationSettingsProvider>
+          <TokenProvider>
+            <MemoryRouter initialEntries={[path]}>
+              <AppRoutes />
+            </MemoryRouter>
+          </TokenProvider>
+        </TranslationSettingsProvider>
       </ThemeProvider>
     </QueryClientProvider>,
   );
@@ -63,6 +66,14 @@ describe("AppRoutes", () => {
 
     expect(screen.getByRole("alert")).toHaveTextContent(/token is required/i);
     expect(screen.queryByRole("heading", { name: /page not found/i })).toBeNull();
+  });
+
+  it("resolves the settings route", () => {
+    // plan.md 3.3 gives settings a route of its own so Back behaves like every
+    // other screen.
+    renderAt(ROUTE_SETTINGS);
+
+    expect(screen.getByRole("heading", { level: 1, name: /^settings$/i })).toBeVisible();
   });
 
   it("shows a not-found screen for an unknown route", () => {
