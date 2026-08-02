@@ -173,12 +173,16 @@ export function TranslationFileBrowser({
                 comments={{
                   onReply: canWrite ? actions.reply : null,
                   onCreate: canWrite
-                    ? (line, body, immediate) => {
+                    ? (line, body, immediate, startLine) => {
                         const comment = {
                           path: selectedFile.id,
                           line,
                           side: "RIGHT" as const,
                           body,
+                          // plan.md 4.9: a range carries both ends and both sides.
+                          ...(startLine === undefined
+                            ? {}
+                            : { startLine, startSide: "RIGHT" as const }),
                         };
                         return immediate ? actions.postNow(comment) : actions.addToPending(comment);
                       }

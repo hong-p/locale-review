@@ -30,8 +30,11 @@ export const messages = {
     rememberHint:
       "Off by default, the token is kept only for this browser tab. Turning this on stores it on this device — avoid it on a shared computer.",
     guidance:
-      "A fine-grained token limited to the repositories you review, with Contents read-only, Pull requests read and write, and a short expiry.",
-    createLink: "Create a fine-grained token on GitHub",
+      "For your own repositories: a fine-grained token limited to those repositories, with Contents read-only and Pull requests read and write.",
+    guidanceThirdParty:
+      "To review someone else's public repository, use a classic token with the public_repo scope. A fine-grained token is always read-only on repositories you do not own, so it can display a pull request but cannot comment, review, or mark files viewed.",
+    createLink: "Create a fine-grained token",
+    createClassicLink: "Create a classic token",
     signedInAs: "Signed in as",
     testPassed: "Connection verified. GitHub accepted this token for",
     repositoryScope:
@@ -120,6 +123,8 @@ export const messages = {
     overallHeading: "Overall comments",
     addOnLine: "Add a comment on line",
     newOnLine: "New comment on line",
+    newOnLines: "New comment on lines",
+    shiftToExtend: "Shift-click another line to comment on a range",
     postNow: "Comment now",
     addToReview: "Add to review",
     cancel: "Cancel",
@@ -145,6 +150,7 @@ export const messages = {
   },
   refresh: {
     refresh: "Refresh",
+    refreshing: "Refreshing…",
     newChanges: "New changes are available on GitHub.",
     reload: "Reload",
     reloadAnyway: "Reload anyway",
@@ -166,7 +172,7 @@ export const messages = {
       "GitHub did not accept the token. It may be expired, revoked, or mistyped. Set it again on the start screen.",
     permissionTitle: "This token cannot see that repository",
     permissionBody:
-      "GitHub accepted the token but refused the repository. A fine-grained token only reaches the repositories it was granted, and reading a public repository you do not own needs Public Repositories (read-only) on the token. Check the token's repository access, or use a classic token with the public_repo scope.",
+      "GitHub accepted the token but refused this repository. A fine-grained token only reaches the repositories it was granted; check its repository access. For a public repository owned by someone else, a classic token with the public_repo scope is the one that also allows reviewing.",
     rateLimitTitle: "GitHub rate limit reached",
     rateLimitBody: "No further requests will succeed until the limit resets.",
     rateLimitResetsAt: "Resets at",

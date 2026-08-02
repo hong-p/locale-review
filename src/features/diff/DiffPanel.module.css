@@ -207,3 +207,14 @@
   width: 1.4rem;
   margin-right: var(--space-2);
 }
+
+/* A line inside the pending selection, so a multi-line range is visible while
+   it is being chosen. */
+.selected {
+  box-shadow: inset 3px 0 0 var(--color-accent-emphasis);
+}
+
+.addCommentActive {
+  composes: addComment;
+  opacity: 1;
+}

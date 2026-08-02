@@ -12,13 +12,22 @@ import styles from "./CommentComposer.module.css";
  */
 
 export type CommentComposerProps = {
+  /** The last line of the selection, which is where the comment is anchored. */
   line: number;
+  /** Set for a multi-line comment; the range runs from here to `line`. */
+  startLine?: number;
   isBusy: boolean;
   onCancel: () => void;
   onSubmit: (body: string, immediate: boolean) => Promise<void>;
 };
 
-export function CommentComposer({ line, isBusy, onCancel, onSubmit }: CommentComposerProps) {
+export function CommentComposer({
+  line,
+  startLine,
+  isBusy,
+  onCancel,
+  onSubmit,
+}: CommentComposerProps) {
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
   const fieldId = useId();
@@ -44,7 +53,9 @@ export function CommentComposer({ line, isBusy, onCancel, onSubmit }: CommentCom
       }}
     >
       <label htmlFor={fieldId} className={styles.label}>
-        {messages.comments.newOnLine} {line}
+        {startLine === undefined
+          ? `${messages.comments.newOnLine} ${line}`
+          : `${messages.comments.newOnLines} ${startLine}–${line}`}
       </label>
       <textarea
         id={fieldId}

@@ -33,7 +33,9 @@ export type PanelRow = {
 export type CommentCapabilities = {
   /** Null disables replying and writing entirely (read-only mode). */
   onReply: ((inReplyToId: number, body: string) => Promise<void>) | null;
-  onCreate: ((line: number, body: string, immediate: boolean) => Promise<void>) | null;
+  onCreate:
+    | ((line: number, body: string, immediate: boolean, startLine?: number) => Promise<void>)
+    | null;
   isBusy: boolean;
 };
 
@@ -61,6 +63,22 @@ export function DiffPanel({
   emptyMessage,
   comments,
 }: DiffPanelProps) {
+  /**
+   * The lines a new comment covers (plan.md 4.9 allows a range).
+   *
+   * Held by the panel rather than a line, because a range belongs to no single
+   * one. Clicking + starts a one-line range; shift-clicking another + extends
+   * it, which is how GitHub's drag selection behaves without needing a drag.
+   */
+  const [range, setRange] = useState<{ start: number; end: number } | null>(null);
+
+  const onAdd = (line: number, extend: boolean) => {
+    setRange((current) =>
+      extend && current !== null
+        ? { start: Math.min(current.start, line), end: Math.max(current.end, line) }
+        : { start: line, end: line },
+    );
+  };
   // plan.md 4.4: only the translation body follows the locale's direction;
   // numbers, markers, and chrome stay left-to-right.
   const dir = isRtlLocale(locale) ? "rtl" : "ltr";
@@ -94,6 +112,9 @@ export function DiffPanel({
                 locale={locale}
                 searchTerm={searchTerm}
                 comments={comments}
+                range={range}
+                onAdd={onAdd}
+                onCancel={() => setRange(null)}
               />
             ))}
           </div>
@@ -110,6 +131,9 @@ function PanelLine({
   locale,
   searchTerm,
   comments,
+  range,
+  onAdd,
+  onCancel,
 }: {
   row: PanelRow;
   side: DiffPanelProps["side"];
@@ -117,8 +141,10 @@ function PanelLine({
   locale: string;
   searchTerm: string;
   comments?: CommentCapabilities;
+  range: { start: number; end: number } | null;
+  onAdd: (line: number, extend: boolean) => void;
+  onCancel: () => void;
 }) {
-  const [composing, setComposing] = useState(false);
   const { line } = row;
   const number = side === "after" ? line.afterLine : line.beforeLine;
 
@@ -133,6 +159,9 @@ function PanelLine({
   const matchesSearch =
     searchTerm !== "" && line.text.toLowerCase().includes(searchTerm.toLowerCase());
 
+  const inRange = range !== null && number !== null && number >= range.start && number <= range.end;
+  const isRangeEnd = range !== null && number === range.end;
+
   return (
     <>
       {row.precedingGap !== null && (
@@ -143,7 +172,9 @@ function PanelLine({
         </div>
       )}
       <div
-        className={`${styles.line} ${rowClass ?? ""} ${matchesSearch ? styles.searchHit : ""}`}
+        className={`${styles.line} ${rowClass ?? ""} ${matchesSearch ? styles.searchHit : ""} ${
+          inRange ? styles.selected : ""
+        }`}
         data-change={change}
       >
         <span className={styles.number}>{number ?? ""}</span>
@@ -152,12 +183,14 @@ function PanelLine({
         </span>
         {/* plan.md 4.9: only a line GitHub accepts, and only when writing is
             available. It sits in the gutter so it never shifts the text. */}
-        {row.canComment && comments?.onCreate && !composing ? (
+        {row.canComment && comments?.onCreate ? (
           <button
             type="button"
-            className={styles.addComment}
-            onClick={() => setComposing(true)}
+            className={inRange ? styles.addCommentActive : styles.addComment}
+            onClick={(event) => onAdd(number ?? 0, event.shiftKey)}
             aria-label={`${messages.comments.addOnLine} ${number ?? ""}`}
+            aria-pressed={inRange}
+            title={messages.comments.shiftToExtend}
           >
             +
           </button>
@@ -183,16 +216,24 @@ function PanelLine({
         </div>
       ))}
 
-      {composing && comments?.onCreate && number !== null && (
+      {/* The composer sits at the end of the range, so a multi-line selection
+          reads downward into the box the way GitHub's does. */}
+      {isRangeEnd && comments?.onCreate && range !== null && (
         <div className={styles.threadRow}>
           <div className={styles.threadCell}>
             <CommentComposer
-              line={number}
+              line={range.end}
+              startLine={range.start === range.end ? undefined : range.start}
               isBusy={comments.isBusy}
-              onCancel={() => setComposing(false)}
+              onCancel={onCancel}
               onSubmit={async (body, immediate) => {
-                await comments.onCreate?.(number, body, immediate);
-                setComposing(false);
+                await comments.onCreate?.(
+                  range.end,
+                  body,
+                  immediate,
+                  range.start === range.end ? undefined : range.start,
+                );
+                onCancel();
               }}
             />
           </div>

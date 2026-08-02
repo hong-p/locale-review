@@ -403,7 +403,11 @@ describe("GraphQL error classification", () => {
     const error = await captureError(() => client().graphql("mutation {}", {}, isData));
 
     expect(error?.code).toBe("permission-denied");
-    expect(error?.message).toMatch(/pull requests write permission/i);
+    // The wording has to name both cases: a fine-grained token needs Pull
+    // requests write on your own repository, and cannot write at all to one
+    // you do not own, where only a classic token works.
+    expect(error?.message).toMatch(/pull requests: read and write/i);
+    expect(error?.message).toMatch(/public_repo/i);
   });
 
   it("maps NOT_FOUND and RATE_LIMITED to their own codes", async () => {

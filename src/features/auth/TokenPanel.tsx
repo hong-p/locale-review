@@ -5,7 +5,8 @@ import { testConnection } from "./connection";
 import styles from "./TokenPanel.module.css";
 import { useToken } from "./TokenContext";
 
-const CREATE_TOKEN_URL = "https://github.com/settings/personal-access-tokens/new";
+const CREATE_FINE_GRAINED_URL = "https://github.com/settings/personal-access-tokens/new";
+const CREATE_CLASSIC_URL = "https://github.com/settings/tokens/new?scopes=public_repo";
 
 /**
  * Setting, testing, and clearing the token (plan.md 5.1, 5.2).
@@ -92,9 +93,18 @@ export function TokenPanel() {
       </div>
 
       <p className={styles.guidance}>{messages.token.guidance}</p>
-      <a href={CREATE_TOKEN_URL} target="_blank" rel="noreferrer noopener">
-        {messages.token.createLink}
-      </a>
+      {/* The distinction that actually decides which token works: a
+          fine-grained token cannot write to a repository you do not own, which
+          is most of what this app is used for. */}
+      <p className={styles.guidance}>{messages.token.guidanceThirdParty}</p>
+      <p className={styles.actions}>
+        <a href={CREATE_FINE_GRAINED_URL} target="_blank" rel="noreferrer noopener">
+          {messages.token.createLink}
+        </a>
+        <a href={CREATE_CLASSIC_URL} target="_blank" rel="noreferrer noopener">
+          {messages.token.createClassicLink}
+        </a>
+      </p>
 
       <div className={styles.actions}>
         {token === null ? (

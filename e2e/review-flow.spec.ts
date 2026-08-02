@@ -492,5 +492,63 @@ test("says why a refused Viewed change failed", async ({ page }) => {
   await page.getByRole("checkbox", { name: /^viewed$/i }).click();
 
   // Not "GitHub did not accept that change", which gave nothing to act on.
-  await expect(page.getByText(/pull requests write permission/i)).toBeVisible();
+  // The wording names the fine-grained limitation too, since a fine-grained
+  // token can never write to a repository the user does not own.
+  await expect(page.getByText(/pull requests: read and write/i)).toBeVisible();
+  await expect(page.getByText(/public_repo/i)).toBeVisible();
+});
+
+test("comments on a range of lines with shift-click", async ({ page }) => {
+  // plan.md 4.9 supports start_line/start_side; the panel exposes it by
+  // extending the selection rather than requiring a drag.
+  const recorder = await mockGitHub(page);
+  await openPullRequest(page);
+
+  const after = page.getByRole("region", { name: "After", exact: true });
+  // The fixture's hunk covers 58 to 60, and only those lines take a comment.
+  await after.getByRole("button", { name: /add a comment on line 58/i }).click();
+  await after
+    .getByRole("button", { name: /add a comment on line 60/i })
+    .click({ modifiers: ["Shift"] });
+
+  await expect(page.getByLabel(/new comment on lines 58–60/i)).toBeVisible();
+  await page.getByLabel(/new comment on lines 58–60/i).fill("이 문단 전체가 어색합니다");
+  await page.getByRole("button", { name: /^comment now$/i }).click();
+
+  await expect
+    .poll(() => recorder.posted.find((p) => p.url.endsWith("/comments"))?.body)
+    .toMatchObject({ line: 60, start_line: 58, side: "RIGHT", start_side: "RIGHT" });
+});
+
+test("refresh reports that it ran", async ({ page }) => {
+  // It used to invalidate queries whose contents are keyed by commit and
+  // marked permanently fresh, so nothing refetched and nothing changed.
+  await mockGitHub(page);
+  await openPullRequest(page);
+
+  let refetched = 0;
+  await page.route(
+    "https://api.github.com/repos/example-org/docs-site/pulls/7/files**",
+    (route) => {
+      refetched += 1;
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            filename: "content/ko/guide.md",
+            status: "modified",
+            additions: 1,
+            deletions: 1,
+            patch: "@@ -58,3 +58,3 @@\n a\n-b\n+c\n a",
+            sha: "blob-ko",
+          },
+        ]),
+      });
+    },
+  );
+
+  await page.getByRole("button", { name: /^refresh$/i }).click();
+
+  await expect.poll(() => refetched).toBeGreaterThan(0);
 });
