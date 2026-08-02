@@ -45,7 +45,7 @@
  */
 .grid {
   display: grid;
-  height: max(var(--diff-panel-height), calc(100dvh - 20rem));
+  height: max(var(--diff-panel-height), calc(100dvh - 19rem));
   gap: var(--space-3);
   /* The column count follows how many panels are visible; the custom property
      is the one runtime value plan.md 3.7 allows through inline style. */

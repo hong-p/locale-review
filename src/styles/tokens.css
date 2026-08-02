@@ -52,7 +52,7 @@
    * whatever else appears above the diff — outdated comments most of all — has
    * to scroll the review body rather than squeeze the text being compared.
    */
-  --diff-panel-height: 28rem;
+  --diff-panel-height: 36rem;
 
   /* Radii and borders */
   --radius-1: 4px;
