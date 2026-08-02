@@ -79,3 +79,12 @@
 .author {
   font-weight: 600;
 }
+
+.verdict {
+  padding: 0 var(--space-2);
+  border: var(--border-width) solid currentcolor;
+  border-radius: var(--radius-3);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-fg-muted);
+}

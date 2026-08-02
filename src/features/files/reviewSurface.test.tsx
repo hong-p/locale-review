@@ -100,6 +100,7 @@ function Surface({ canWrite }: { canWrite: boolean }) {
         open
         onClose={() => {}}
         issueComments={[]}
+        reviews={[]}
         canSubmit={canWrite}
         isBusy={false}
         unreviewedLocales={unreviewed}

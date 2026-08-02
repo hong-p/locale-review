@@ -1,0 +1,17 @@
+.toolbar {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.button {
+  min-width: 2rem;
+  padding: 0 var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  line-height: 1.8;
+  color: var(--color-fg-muted);
+}
+
+.button:hover:not(:disabled) {
+  color: var(--color-fg);
+}

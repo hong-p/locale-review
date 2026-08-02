@@ -27,6 +27,11 @@ export const handlers: RequestHandler[] = [
   http.get(`${GITHUB_API_ORIGIN}/repos/:owner/:repo/issues/:number/comments`, () =>
     HttpResponse.json([]),
   ),
+  // Submitted review bodies are part of the conversation the surface reads
+  // (plan.md 4.8), so an empty list is the baseline here too.
+  http.get(`${GITHUB_API_ORIGIN}/repos/:owner/:repo/pulls/:number/reviews`, () =>
+    HttpResponse.json([]),
+  ),
   http.post(`${GITHUB_API_ORIGIN}/graphql`, () =>
     HttpResponse.json({
       data: {

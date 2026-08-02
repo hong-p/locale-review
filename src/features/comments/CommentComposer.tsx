@@ -1,7 +1,8 @@
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 
 import { messages } from "../../messages/en";
 import styles from "./CommentComposer.module.css";
+import { MarkdownToolbar } from "./MarkdownToolbar";
 import { writeFailureMessage } from "./writeFailureMessage";
 
 /**
@@ -32,6 +33,7 @@ export function CommentComposer({
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
   const fieldId = useId();
+  const textarea = useRef<HTMLTextAreaElement | null>(null);
 
   const send = async (immediate: boolean) => {
     const trimmed = body.trim();
@@ -59,8 +61,10 @@ export function CommentComposer({
           ? `${messages.comments.newOnLine} ${line}`
           : `${messages.comments.newOnLines} ${startLine}–${line}`}
       </label>
+      <MarkdownToolbar textarea={textarea} value={body} onChange={setBody} disabled={isBusy} />
       <textarea
         id={fieldId}
+        ref={textarea}
         className={styles.textarea}
         value={body}
         rows={3}

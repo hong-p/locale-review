@@ -5,8 +5,10 @@ import { useToken } from "../auth/TokenContext";
 import {
   type CommentThread,
   type IssueComment,
+  type ReviewSummary,
   fetchIssueComments,
   fetchReviewComments,
+  fetchReviewSummaries,
   groupIntoThreads,
 } from "./fetchReviewComments";
 import {
@@ -33,6 +35,8 @@ export function reviewCommentsQueryKey(ref: PullRequestRef) {
 export type ConversationData = {
   threads: CommentThread[];
   issueComments: IssueComment[];
+  /** Submitted review bodies, which are not issue comments (plan.md 4.8). */
+  reviews: ReviewSummary[];
 };
 
 export function useReviewComments(ref: PullRequestRef | null) {
@@ -43,11 +47,12 @@ export function useReviewComments(ref: PullRequestRef | null) {
     enabled: client !== null && ref !== null,
     queryFn: async ({ signal }) => {
       if (!client || !ref) throw new Error("useReviewComments ran without a client or ref");
-      const [comments, issueComments] = await Promise.all([
+      const [comments, issueComments, reviews] = await Promise.all([
         fetchReviewComments(client, ref, signal),
         fetchIssueComments(client, ref, signal),
+        fetchReviewSummaries(client, ref, signal),
       ]);
-      return { threads: groupIntoThreads(comments), issueComments };
+      return { threads: groupIntoThreads(comments), issueComments, reviews };
     },
   });
 }

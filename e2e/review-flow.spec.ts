@@ -597,3 +597,72 @@ test("shows the overall conversation beside the review form", async ({ page }) =
   await expect(conversation).toContainText("maintainer");
   await expect(conversation).toContainText("전반적으로 좋습니다");
 });
+
+test("the inline editor fills the panel width", async ({ page }) => {
+  // It was rendering far narrower than the panel, which left a comment box too
+  // small to write a sentence in.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockGitHub(page);
+  await openPullRequest(page);
+
+  const after = page.getByRole("region", { name: "After", exact: true });
+  await after.getByRole("button", { name: /add a comment on line 60/i }).click();
+
+  const editor = await page.getByLabel(/new comment on line 60/i).boundingBox();
+  const panel = await after.boundingBox();
+
+  // Only the row and composer padding, no gutter indent.
+  expect((editor?.width ?? 0) / (panel?.width ?? 1)).toBeGreaterThan(0.88);
+});
+
+test("shows a submitted review body in the conversation", async ({ page }) => {
+  // A review body is not an issue comment; fetching only issue comments left
+  // every "left a comment" review invisible (plan.md 4.8).
+  await mockGitHub(page);
+  await page.route(
+    "https://api.github.com/repos/example-org/docs-site/pulls/7/reviews**",
+    (route) => {
+      if (route.request().method() !== "GET") {
+        return route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            id: 70,
+            state: "APPROVED",
+            user: { login: "maintainer" },
+            submitted_at: "2026-01-03T00:00:00Z",
+            body: "번역 좋습니다",
+            body_html: "<p>번역 좋습니다</p>",
+            html_url: "https://github.com/example-org/docs-site/pull/7#pullrequestreview-70",
+          },
+        ]),
+      });
+    },
+  );
+  await openPullRequest(page);
+
+  await page.getByRole("button", { name: /^review changes$/i }).click();
+
+  const conversation = page.getByRole("region", { name: /overall comments/i });
+  await expect(conversation).toContainText("번역 좋습니다");
+  // plan.md 7: the verdict is a word.
+  await expect(conversation).toContainText("Approve");
+});
+
+test("offers markdown shortcuts in the comment editor", async ({ page }) => {
+  await mockGitHub(page);
+  await openPullRequest(page);
+
+  const after = page.getByRole("region", { name: "After", exact: true });
+  await after.getByRole("button", { name: /add a comment on line 60/i }).click();
+
+  const editor = page.getByLabel(/new comment on line 60/i);
+  await editor.fill("어색합니다");
+  await editor.selectText();
+  await page.getByRole("button", { name: "Bold", exact: true }).click();
+
+  await expect(editor).toHaveValue("**어색합니다**");
+});

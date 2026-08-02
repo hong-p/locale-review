@@ -1,8 +1,9 @@
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 
 import { messages } from "../../messages/en";
 import styles from "./ReviewSummaryBox.module.css";
 import type { ReviewEvent } from "./submitReview";
+import { MarkdownToolbar } from "./MarkdownToolbar";
 import { writeFailureMessage } from "./writeFailureMessage";
 
 /**
@@ -43,6 +44,7 @@ export function ReviewSummaryBox({
   const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bodyId = useId();
+  const textarea = useRef<HTMLTextAreaElement | null>(null);
 
   const chosen = EVENTS.find((entry) => entry.event === event);
   const needsConfirmation = (chosen?.needsWarning ?? false) && unreviewedLocales.length > 0;
@@ -74,8 +76,15 @@ export function ReviewSummaryBox({
       <label htmlFor={bodyId} className={styles.label}>
         {messages.review.bodyLabel}
       </label>
+      <MarkdownToolbar
+        textarea={textarea}
+        value={body}
+        onChange={onBodyChange}
+        disabled={!canSubmit}
+      />
       <textarea
         id={bodyId}
+        ref={textarea}
         className={styles.textarea}
         value={body}
         rows={4}

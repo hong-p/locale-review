@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useId, useRef, useState } from "react";
 
 import { messages } from "../../messages/en";
 import type { CommentThread } from "./fetchReviewComments";
 import styles from "./CommentThreadView.module.css";
+import { MarkdownToolbar } from "./MarkdownToolbar";
 import { sanitizeCommentHtml } from "./sanitizeCommentHtml";
 import { writeFailureMessage } from "./writeFailureMessage";
 
@@ -23,6 +24,8 @@ export type CommentThreadViewProps = {
 export function CommentThreadView({ thread, canReply, isBusy, onReply }: CommentThreadViewProps) {
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const textarea = useRef<HTMLTextAreaElement | null>(null);
+  const replyId = useId();
 
   const submit = async () => {
     if (draft.trim() === "") return;
@@ -87,10 +90,22 @@ export function CommentThreadView({ thread, canReply, isBusy, onReply }: Comment
             void submit();
           }}
         >
-          <label className={styles.replyLabel}>
+          <label className={styles.replyLabel} htmlFor={replyId}>
             {messages.comments.replyLabel}
-            <textarea value={draft} onChange={(event) => setDraft(event.target.value)} rows={3} />
           </label>
+          <MarkdownToolbar
+            textarea={textarea}
+            value={draft}
+            onChange={setDraft}
+            disabled={isBusy}
+          />
+          <textarea
+            id={replyId}
+            ref={textarea}
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            rows={3}
+          />
           <button type="submit" disabled={isBusy || draft.trim() === ""}>
             {isBusy ? messages.comments.sending : messages.comments.reply}
           </button>

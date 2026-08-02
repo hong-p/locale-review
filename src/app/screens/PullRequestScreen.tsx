@@ -172,6 +172,7 @@ function LoadedPullRequest({
         open={reviewOpen}
         onClose={() => setReviewOpen(false)}
         issueComments={conversations.data?.issueComments ?? []}
+        reviews={conversations.data?.reviews ?? []}
         canSubmit={canWrite}
         isBusy={actions.isBusy}
         unreviewedLocales={unreviewed}

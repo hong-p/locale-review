@@ -130,6 +130,7 @@ export const messages = {
     cancel: "Cancel",
     createFailed: "The comment was not posted. Your text is still here.",
     outdatedHeading: "Comments on lines that no longer exist",
+    dismissed: "Dismissed",
   },
   review: {
     heading: "Submit review",
@@ -160,6 +161,15 @@ export const messages = {
     unmappedBody: "These lines no longer exist in the diff. Copy the text before deleting it.",
     copy: "Copy",
     delete: "Delete",
+  },
+  markdown: {
+    label: "Markdown formatting",
+    bold: "Bold",
+    italic: "Italic",
+    code: "Code",
+    quote: "Quote",
+    list: "Bulleted list",
+    link: "Link",
   },
   loadErrors: {
     invalidUrlTitle: "That is not a pull request URL",
