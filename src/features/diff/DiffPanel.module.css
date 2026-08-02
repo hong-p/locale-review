@@ -52,10 +52,16 @@
 .lines {
   display: flex;
   flex-direction: column;
-  /* Never narrower than the panel, so a full-width comment row fills it even
-     when every line is short. */
-  min-width: 100%;
-  width: max-content;
+  /*
+   * Exactly the panel's width, never wider.
+   *
+   * `max-content` here would size the container to the longest unwrapped line,
+   * which defeats the wrapping on `.text` and drags every comment row out to
+   * that width. This app compares prose, where a Markdown paragraph is one very
+   * long line, so wrapping is the readable choice and there is no horizontal
+   * scrolling to do.
+   */
+  width: 100%;
   font-family: var(--font-mono);
   font-size: var(--font-size-base);
   line-height: var(--line-height-diff);

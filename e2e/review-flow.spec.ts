@@ -666,3 +666,40 @@ test("offers markdown shortcuts in the comment editor", async ({ page }) => {
 
   await expect(editor).toHaveValue("**어색합니다**");
 });
+
+test("wraps long prose instead of scrolling sideways", async ({ page }) => {
+  // A Markdown paragraph is one very long line. Scrolling sideways through a
+  // Korean paragraph is unreadable, and it also dragged comment rows out to
+  // the width of the longest line.
+  await page.setViewportSize({ width: 1200, height: 800 });
+  await mockGitHub(page, {
+    contentFor: (path) =>
+      path.includes("/content/ko/") ? `${"매우 긴 한국어 문단입니다. ".repeat(40)}\n` : null,
+  });
+  await openPullRequest(page);
+
+  const scroller = page.getByRole("region", { name: "After", exact: true }).locator("div").first();
+
+  const overflow = await scroller.evaluate((el) => el.scrollWidth - el.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+});
+
+test("a comment row stays the width of the panel beside a long line", async ({ page }) => {
+  await page.setViewportSize({ width: 1200, height: 800 });
+  await mockGitHub(page, {
+    contentFor: (path) =>
+      path.includes("/content/ko/")
+        ? `${"짧은 줄\n".repeat(58)}${"아주 긴 줄입니다. ".repeat(40)}\n`
+        : null,
+  });
+  await openPullRequest(page);
+
+  const after = page.getByRole("region", { name: "After", exact: true });
+  await after.getByRole("button", { name: /add a comment on line 59/i }).click();
+
+  const editor = await page.getByLabel(/new comment on line 59/i).boundingBox();
+  const panel = await after.boundingBox();
+
+  expect((editor?.width ?? 0) / (panel?.width ?? 1)).toBeLessThan(1);
+  expect((editor?.width ?? 0) / (panel?.width ?? 1)).toBeGreaterThan(0.85);
+});
