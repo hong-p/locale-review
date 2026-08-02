@@ -2,6 +2,7 @@ import { useId, useState } from "react";
 
 import { messages } from "../../messages/en";
 import styles from "./CommentComposer.module.css";
+import { writeFailureMessage } from "./writeFailureMessage";
 
 /**
  * Writing a new inline comment on one line (plan.md 4.9).
@@ -38,9 +39,10 @@ export function CommentComposer({
     try {
       await onSubmit(trimmed, immediate);
       setError(null);
-    } catch {
-      // plan.md 4.9: a failed write keeps the text exactly where it was.
-      setError(messages.comments.createFailed);
+    } catch (failure) {
+      // plan.md 4.9: a failed write keeps the text exactly where it was, and
+      // says why rather than only that it failed.
+      setError(writeFailureMessage(failure, messages.comments.createFailed));
     }
   };
 

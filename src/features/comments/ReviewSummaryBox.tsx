@@ -3,6 +3,7 @@ import { useId, useState } from "react";
 import { messages } from "../../messages/en";
 import styles from "./ReviewSummaryBox.module.css";
 import type { ReviewEvent } from "./submitReview";
+import { writeFailureMessage } from "./writeFailureMessage";
 
 /**
  * Submitting the review (plan.md 4.9).
@@ -52,9 +53,9 @@ export function ReviewSummaryBox({
     try {
       await onSubmit(event, body);
       setError(null);
-    } catch {
+    } catch (failure) {
       // plan.md 4.9: the text stays put on failure.
-      setError(messages.review.submitFailed);
+      setError(writeFailureMessage(failure, messages.review.submitFailed));
     }
   };
 

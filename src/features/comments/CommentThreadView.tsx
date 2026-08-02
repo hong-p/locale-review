@@ -4,6 +4,7 @@ import { messages } from "../../messages/en";
 import type { CommentThread } from "./fetchReviewComments";
 import styles from "./CommentThreadView.module.css";
 import { sanitizeCommentHtml } from "./sanitizeCommentHtml";
+import { writeFailureMessage } from "./writeFailureMessage";
 
 /**
  * One existing conversation (plan.md 4.8).
@@ -30,8 +31,8 @@ export function CommentThreadView({ thread, canReply, isBusy, onReply }: Comment
       // plan.md 4.9: clear only after the write is confirmed.
       setDraft("");
       setError(null);
-    } catch {
-      setError(messages.comments.replyFailed);
+    } catch (failure) {
+      setError(writeFailureMessage(failure, messages.comments.replyFailed));
     }
   };
 

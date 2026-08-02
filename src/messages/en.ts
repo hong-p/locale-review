@@ -170,6 +170,8 @@ export const messages = {
     tokenRejectedTitle: "Your token was rejected",
     tokenRejectedBody:
       "GitHub did not accept the token. It may be expired, revoked, or mistyped. Set it again on the start screen.",
+    writeForbiddenBody:
+      "GitHub accepted the token but refused to write. On your own repositories a fine-grained token needs Pull requests: Read and write. On a public repository owned by someone else a fine-grained token is read-only whatever it is granted, and only a classic token with the public_repo scope can write there.",
     permissionTitle: "This token cannot see that repository",
     permissionBody:
       "GitHub accepted the token but refused this repository. A fine-grained token only reaches the repositories it was granted; check its repository access. For a public repository owned by someone else, a classic token with the public_repo scope is the one that also allows reviewing.",
