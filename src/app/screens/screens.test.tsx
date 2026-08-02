@@ -184,6 +184,21 @@ describe("token panel", () => {
     expect(screen.getByText(/no token set/i)).toBeVisible();
   });
 
+  it("points at a classic token and at nothing else", () => {
+    // plan.md 5.1: a fine-grained token cannot write to a repository the user
+    // does not own, which is most of what this app is for, so offering one as
+    // an option only invited the token that fails.
+    renderApp(ROUTE_START);
+
+    expect(screen.getByRole("link", { name: /create a classic token/i })).toHaveAttribute(
+      "href",
+      expect.stringContaining("scopes=public_repo"),
+    );
+    expect(screen.queryByRole("link", { name: /fine-grained/i })).toBeNull();
+    // The reason is still stated, so a rejected fine-grained token makes sense.
+    expect(screen.getByText(/fine-grained token will not do/i)).toBeVisible();
+  });
+
   it("moves the token between stores when remember is toggled", async () => {
     const user = userEvent.setup();
     seedToken("ghp_move_me");

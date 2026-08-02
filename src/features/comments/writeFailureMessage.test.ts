@@ -7,7 +7,7 @@ import { writeFailureMessage } from "./writeFailureMessage";
 const FALLBACK = "It did not work.";
 
 describe("writeFailureMessage", () => {
-  it("names the fine-grained limitation for a refusal", () => {
+  it("names the token that can write for a refusal", () => {
     // The case a reviewer actually hits on someone else's public repository.
     const error = new GitHubRequestError({
       code: "permission-denied",
@@ -17,7 +17,7 @@ describe("writeFailureMessage", () => {
 
     const message = writeFailureMessage(error, FALLBACK);
 
-    expect(message).toMatch(/pull requests: read and write/i);
+    expect(message).toMatch(/classic token/i);
     expect(message).toMatch(/public_repo/i);
   });
 

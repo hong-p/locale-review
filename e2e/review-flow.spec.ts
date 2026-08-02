@@ -495,9 +495,9 @@ test("says why a refused Viewed change failed", async ({ page }) => {
   await page.getByRole("checkbox", { name: /^viewed$/i }).click();
 
   // Not "GitHub did not accept that change", which gave nothing to act on.
-  // The wording names the fine-grained limitation too, since a fine-grained
-  // token can never write to a repository the user does not own.
-  await expect(page.getByText(/pull requests: read and write/i)).toBeVisible();
+  // The wording names the token that would work, rather than only reporting
+  // that GitHub said no.
+  await expect(page.getByText(/classic token/i)).toBeVisible();
   await expect(page.getByText(/public_repo/i)).toBeVisible();
 });
 
