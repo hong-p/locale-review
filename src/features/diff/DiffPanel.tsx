@@ -1,6 +1,9 @@
-import { type RefObject, useMemo } from "react";
+import { type RefObject, useMemo, useState } from "react";
 
 import { messages } from "../../messages/en";
+import { CommentComposer } from "../comments/CommentComposer";
+import { CommentThreadView } from "../comments/CommentThreadView";
+import type { CommentThread } from "../comments/fetchReviewComments";
 import { isRtlLocale } from "../locales/textDirection";
 import styles from "./DiffPanel.module.css";
 import { computeIntraLineDiff } from "./intraLineDiff";
@@ -18,8 +21,20 @@ export type PanelRow = {
   line: DiffLine;
   /** The paired line on the other side, when intra-line marking applies. */
   counterpart: string | null;
-  /** True where lines were skipped in `Changes only` mode. */
+  /** How many lines were skipped before this one in `Changes only` mode. */
   precedingGap: number | null;
+  /** Conversations anchored to this line (plan.md 4.8). */
+  threads: CommentThread[];
+  /** Whether GitHub would accept a new comment here (plan.md 4.9). */
+  canComment: boolean;
+};
+
+/** What a panel may do with comments, decided by the caller's permissions. */
+export type CommentCapabilities = {
+  /** Null disables replying and writing entirely (read-only mode). */
+  onReply: ((inReplyToId: number, body: string) => Promise<void>) | null;
+  onCreate: ((line: number, body: string, immediate: boolean) => Promise<void>) | null;
+  isBusy: boolean;
 };
 
 export type DiffPanelProps = {
@@ -32,6 +47,7 @@ export type DiffPanelProps = {
   onScroll?: () => void;
   searchTerm: string;
   emptyMessage?: string;
+  comments?: CommentCapabilities;
 };
 
 export function DiffPanel({
@@ -43,6 +59,7 @@ export function DiffPanel({
   onScroll,
   searchTerm,
   emptyMessage,
+  comments,
 }: DiffPanelProps) {
   // plan.md 4.4: only the translation body follows the locale's direction;
   // numbers, markers, and chrome stay left-to-right.
@@ -76,6 +93,7 @@ export function DiffPanel({
                 dir={dir}
                 locale={locale}
                 searchTerm={searchTerm}
+                comments={comments}
               />
             ))}
           </div>
@@ -91,13 +109,16 @@ function PanelLine({
   dir,
   locale,
   searchTerm,
+  comments,
 }: {
   row: PanelRow;
   side: DiffPanelProps["side"];
   dir: "ltr" | "rtl";
   locale: string;
   searchTerm: string;
+  comments?: CommentCapabilities;
 }) {
+  const [composing, setComposing] = useState(false);
   const { line } = row;
   const number = side === "after" ? line.afterLine : line.beforeLine;
 
@@ -129,10 +150,54 @@ function PanelLine({
         <span className={styles.marker} aria-hidden="true">
           {marker}
         </span>
+        {/* plan.md 4.9: only a line GitHub accepts, and only when writing is
+            available. It sits in the gutter so it never shifts the text. */}
+        {row.canComment && comments?.onCreate && !composing ? (
+          <button
+            type="button"
+            className={styles.addComment}
+            onClick={() => setComposing(true)}
+            aria-label={`${messages.comments.addOnLine} ${number ?? ""}`}
+          >
+            +
+          </button>
+        ) : (
+          <span className={styles.addCommentSpacer} />
+        )}
+
         <span className={styles.text} dir={dir} lang={locale}>
           <LineText row={row} side={side} locale={locale} />
         </span>
       </div>
+
+      {row.threads.map((thread) => (
+        <div className={styles.threadRow} key={thread.rootId}>
+          <div className={styles.threadCell}>
+            <CommentThreadView
+              thread={thread}
+              canReply={comments?.onReply !== null && comments?.onReply !== undefined}
+              isBusy={comments?.isBusy ?? false}
+              onReply={comments?.onReply ?? (async () => undefined)}
+            />
+          </div>
+        </div>
+      ))}
+
+      {composing && comments?.onCreate && number !== null && (
+        <div className={styles.threadRow}>
+          <div className={styles.threadCell}>
+            <CommentComposer
+              line={number}
+              isBusy={comments.isBusy}
+              onCancel={() => setComposing(false)}
+              onSubmit={async (body, immediate) => {
+                await comments.onCreate?.(number, body, immediate);
+                setComposing(false);
+              }}
+            />
+          </div>
+        </div>
+      )}
     </>
   );
 }

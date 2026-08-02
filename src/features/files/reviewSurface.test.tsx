@@ -6,6 +6,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PullRequestDiffBase } from "../../api/types";
 import { server } from "../../test/msw/server";
+import { useState } from "react";
+
+import { ReviewPopover } from "../comments/ReviewPopover";
+import { useCommentActions } from "../comments/useReviewComments";
 import { TokenProvider } from "../auth/TokenContext";
 import { TranslationFileBrowser } from "./TranslationFileBrowser";
 
@@ -73,6 +77,40 @@ function baseHandlers() {
   );
 }
 
+/**
+ * Mirrors how the screen composes these: the browser owns the diff and the
+ * sidebar, while the review form sits in the header as an always-open popover
+ * here so its controls are queryable without a click.
+ */
+function Surface({ canWrite }: { canWrite: boolean }) {
+  const [unreviewed, setUnreviewed] = useState<readonly string[]>([]);
+  const actions = useCommentActions(PR_REF, "head-sha", "translator", canWrite);
+
+  return (
+    <>
+      <TranslationFileBrowser
+        pullRequestRef={PR_REF}
+        diffBase={DIFF_BASE}
+        canWrite={canWrite}
+        actions={actions}
+        readOnlyNotice={false}
+        onLocaleScopeChange={setUnreviewed}
+      />
+      <ReviewPopover
+        open
+        onClose={() => {}}
+        canSubmit={canWrite}
+        isBusy={false}
+        unreviewedLocales={unreviewed}
+        pendingCommentCount={0}
+        body=""
+        onBodyChange={() => {}}
+        onSubmit={actions.submit}
+      />
+    </>
+  );
+}
+
 function renderSurface(canWrite: boolean) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
@@ -81,14 +119,7 @@ function renderSurface(canWrite: boolean) {
   return render(
     <QueryClientProvider client={queryClient}>
       <TokenProvider>
-        <TranslationFileBrowser
-          pullRequestRef={PR_REF}
-          diffBase={DIFF_BASE}
-          canWrite={canWrite}
-          viewerLogin="translator"
-          reviewBody=""
-          onReviewBodyChange={() => {}}
-        />
+        <Surface canWrite={canWrite} />
       </TokenProvider>
     </QueryClientProvider>,
   );
@@ -143,12 +174,15 @@ describe("Viewed", () => {
     await waitFor(() => expect(mutations).toEqual(["mark"]));
   });
 
-  it("disables the checkbox and says why in read-only mode", async () => {
+  it("disables the checkbox when the repository is not usable", async () => {
+    // Note this is not the read-access case: GitHub allows Viewed with read
+    // access, so the control is only disabled when the repository itself
+    // could not be resolved.
     renderSurface(false);
 
     const checkbox = await screen.findByRole("checkbox", { name: /^viewed$/i });
     expect(checkbox).toBeDisabled();
-    expect(screen.getByText(/viewed requires a token that can write/i)).toBeVisible();
+    expect(screen.getByText(/viewed is unavailable/i)).toBeVisible();
   });
 
   it("shows progress over the visible files only", async () => {
@@ -213,12 +247,12 @@ describe("existing conversations", () => {
     expect(box).toHaveValue("동의합니다");
   });
 
-  it("offers no reply box without write access", async () => {
+  it("offers no reply box when writing is unavailable", async () => {
     renderSurface(false);
 
     await screen.findByRole("region", { name: /conversation on/i });
     expect(screen.queryByLabelText(/^reply$/i)).toBeNull();
-    expect(screen.getByText(/replying requires a token/i)).toBeVisible();
+    expect(screen.getByText(/replying needs a token/i)).toBeVisible();
   });
 });
 
@@ -282,7 +316,9 @@ describe("review submission", () => {
     // plan.md 4.9 requires this to be consistent across the surface.
     renderSurface(false);
 
-    await screen.findByRole("button", { name: /^submit review$/i });
+    // The review form is a popover now, so it renders before the file data
+    // arrives; waiting on the file header is what proves the surface is ready.
+    await screen.findByRole("checkbox", { name: /^viewed$/i });
     expect(screen.getByRole("button", { name: /^submit review$/i })).toBeDisabled();
     expect(screen.getByLabelText(/review summary/i)).toBeDisabled();
     expect(screen.getByRole("radio", { name: /^approve$/i })).toBeDisabled();

@@ -1,11 +1,14 @@
 import { useCallback, useId, useMemo, useRef, useState } from "react";
 
 import { messages } from "../../messages/en";
-import { DiffPanel, type PanelRow } from "./DiffPanel";
+import type { CommentThread } from "../comments/fetchReviewComments";
+import { CommentThreadView } from "../comments/CommentThreadView";
+import { type CommentCapabilities, DiffPanel, type PanelRow } from "./DiffPanel";
 import {
   buildDiffRows,
   buildSourceRows,
   collapseToChanges,
+  outdatedThreads,
   rowChangeAnchors,
 } from "./buildPanelRows";
 import { computeLineDiff } from "./lineDiff";
@@ -32,6 +35,9 @@ export type ThreeColumnDiffProps = {
   /** GitHub's patch, used only to decide what `Changes only` keeps. */
   patch: string | null;
   sourceMissing?: boolean;
+  /** Conversations on this file, placed beside the lines they answer. */
+  threads?: readonly CommentThread[];
+  comments?: CommentCapabilities;
 };
 
 const PANEL_ORDER: PanelKey[] = ["source", "before", "after"];
@@ -44,6 +50,8 @@ export function ThreeColumnDiff({
   targetLocale,
   patch,
   sourceMissing = false,
+  threads = [],
+  comments,
 }: ThreeColumnDiffProps) {
   const [visible, setVisible] = useState<Record<PanelKey, boolean>>({
     source: true,
@@ -65,11 +73,14 @@ export function ThreeColumnDiff({
   const syncing = useRef(false);
 
   const lines = useMemo(() => computeLineDiff(beforeText, afterText), [beforeText, afterText]);
-  const hunks: PatchHunk[] = useMemo(() => parsePatch(patch).hunks, [patch]);
+  const parsedPatch = useMemo(() => parsePatch(patch), [patch]);
+  const hunks: PatchHunk[] = parsedPatch.hunks;
+  const stranded = useMemo(() => outdatedThreads(threads), [threads]);
 
   const rows: Record<PanelKey, PanelRow[]> = useMemo(() => {
-    const before = buildDiffRows(lines, "before");
-    const after = buildDiffRows(lines, "after");
+    const rowOptions = { threads, patch: parsedPatch };
+    const before = buildDiffRows(lines, "before", rowOptions);
+    const after = buildDiffRows(lines, "after", rowOptions);
     const source = buildSourceRows(sourceText ?? "");
 
     if (!changesOnly) return { source, before, after };
@@ -81,7 +92,7 @@ export function ThreeColumnDiff({
       before: collapseToChanges(before, hunks, "LEFT"),
       after: collapseToChanges(after, hunks, "RIGHT"),
     };
-  }, [lines, sourceText, changesOnly, hunks]);
+  }, [lines, sourceText, changesOnly, hunks, threads, parsedPatch]);
 
   const anchors = useMemo(() => rowChangeAnchors(rows.after), [rows.after]);
   const [anchorIndex, setAnchorIndex] = useState(0);
@@ -225,6 +236,23 @@ export function ThreeColumnDiff({
 
       {changesOnly && <p className={styles.syncNote}>{messages.diff.syncDisabled}</p>}
 
+      {/* plan.md 4.8: an outdated comment has no line to sit on, so it is shown
+          above the diff rather than dropped. */}
+      {stranded.length > 0 && (
+        <section aria-label={messages.comments.outdatedHeading}>
+          <h3 className={styles.syncNote}>{messages.comments.outdatedHeading}</h3>
+          {stranded.map((thread) => (
+            <CommentThreadView
+              key={thread.rootId}
+              thread={thread}
+              canReply={comments?.onReply != null}
+              isBusy={comments?.isBusy ?? false}
+              onReply={comments?.onReply ?? (async () => undefined)}
+            />
+          ))}
+        </section>
+      )}
+
       <div
         className={styles.grid}
         style={{ "--visible-panels": visibleCount } as React.CSSProperties}
@@ -239,6 +267,7 @@ export function ThreeColumnDiff({
               {...panelProps[key]}
               side={key}
               searchTerm={search}
+              comments={key === "source" ? undefined : comments}
               scrollerRef={{
                 get current() {
                   return scrollers.current[key];

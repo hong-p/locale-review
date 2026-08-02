@@ -1,0 +1,78 @@
+/*
+ * The review body (design 2026-08-02, revised).
+ *
+ * One column, not two. A left sidebar took width the three panels need more,
+ * so file selection, locale filtering, and progress moved into the header
+ * strip above the diff.
+ */
+
+.body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: var(--border-width) solid var(--color-border);
+  background-color: var(--color-canvas-subtle);
+}
+
+.notices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4) 0;
+}
+
+.scrollArea {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/*
+ * The diff takes what is left, but never less than this. On a short window the
+ * area scrolls rather than squeezing the panels to a few lines.
+ */
+.diffArea {
+  flex: 1;
+  min-height: 320px;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+
+.infoNotice,
+.warnNotice {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width) solid;
+  border-radius: var(--radius-2);
+  font-size: var(--font-size-sm);
+}
+
+.infoNotice {
+  border-color: var(--color-border);
+  background-color: var(--color-canvas-subtle);
+  color: var(--color-fg-muted);
+}
+
+.warnNotice {
+  border-color: var(--color-attention-fg);
+  background-color: var(--color-attention-subtle);
+  color: var(--color-fg);
+}
+
+@media (max-width: 900px) {
+  .controls,
+  .notices,
+  .diffArea {
+    padding-left: var(--space-3);
+    padding-right: var(--space-3);
+  }
+}

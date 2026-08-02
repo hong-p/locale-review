@@ -1,6 +1,13 @@
+import type { CommentThread } from "../comments/fetchReviewComments";
 import type { PanelRow } from "./DiffPanel";
 import { type DiffLine, splitLines } from "./lineDiff";
-import { type DiffSide, type PatchHunk, hunkRanges } from "./patchPositions";
+import {
+  type DiffSide,
+  type ParsedPatch,
+  type PatchHunk,
+  hunkRanges,
+  isCommentable,
+} from "./patchPositions";
 
 /**
  * Turning a diff into the rows one panel renders (plan.md 4.6).
@@ -12,18 +19,57 @@ import { type DiffSide, type PatchHunk, hunkRanges } from "./patchPositions";
 
 export type PanelSide = "source" | "before" | "after";
 
-/** Rows for the before or after panel, with intra-line counterparts attached. */
-export function buildDiffRows(lines: readonly DiffLine[], side: "before" | "after"): PanelRow[] {
+export type DiffRowOptions = {
+  /** Existing conversations on this file, placed under the line they answer. */
+  threads?: readonly CommentThread[];
+  /** GitHub's patch, the only authority on where a comment may go (plan.md 4.9). */
+  patch?: ParsedPatch;
+};
+
+/** Rows for the before or after panel, with counterparts and threads attached. */
+export function buildDiffRows(
+  lines: readonly DiffLine[],
+  side: "before" | "after",
+  options: DiffRowOptions = {},
+): PanelRow[] {
   const excluded = side === "before" ? "added" : "removed";
+  const diffSide: DiffSide = side === "before" ? "LEFT" : "RIGHT";
+
+  // A thread is anchored by its own side and line, so a comment written on the
+  // before side never appears beside the after text.
+  const byLine = new Map<number, CommentThread[]>();
+  for (const thread of options.threads ?? []) {
+    if (thread.line === null || thread.side !== diffSide) continue;
+    const existing = byLine.get(thread.line);
+    if (existing) existing.push(thread);
+    else byLine.set(thread.line, [thread]);
+  }
 
   return lines
-    .map((line, index) => ({ line, index }))
-    .filter(({ line }) => line.change !== excluded)
-    .map(({ line }) => ({
-      line,
-      counterpart: line.pairedWith === null ? null : (lines[line.pairedWith]?.text ?? null),
-      precedingGap: null,
-    }));
+    .filter((line) => line.change !== excluded)
+    .map((line) => {
+      const lineNumber = side === "before" ? line.beforeLine : line.afterLine;
+      return {
+        line,
+        counterpart: line.pairedWith === null ? null : (lines[line.pairedWith]?.text ?? null),
+        precedingGap: null,
+        threads: lineNumber === null ? [] : (byLine.get(lineNumber) ?? []),
+        canComment:
+          options.patch !== undefined &&
+          lineNumber !== null &&
+          isCommentable(options.patch, diffSide, lineNumber),
+      };
+    });
+}
+
+/**
+ * Threads GitHub can no longer place on a line (plan.md 4.8's outdated state).
+ *
+ * They have nowhere to sit in the diff, so the panel shows them above it rather
+ * than dropping them.
+ */
+export function outdatedThreads(threads: readonly CommentThread[]): CommentThread[] {
+  return threads.filter((thread) => thread.line === null);
 }
 
 /** Rows for the source panel, which has no diff of its own. */
@@ -38,6 +84,10 @@ export function buildSourceRows(text: string): PanelRow[] {
     },
     counterpart: null,
     precedingGap: null,
+    // The source file is not part of the pull request diff, so GitHub accepts
+    // no comment there (plan.md 4.9).
+    threads: [],
+    canComment: false,
   }));
 }
 
@@ -72,7 +122,14 @@ export function collapseToChanges(
     // patch can disagree — a truncated patch, or a diff computed with different
     // options — and hiding a change the reviewer needs to see is the worse of
     // the two failures.
-    const keep = row.line.change !== "unchanged" || lineNumber === null || inRange(lineNumber);
+    //
+    // A line carrying a conversation is kept for the same reason: compressing
+    // it away would make an existing comment vanish from the view.
+    const keep =
+      row.line.change !== "unchanged" ||
+      row.threads.length > 0 ||
+      lineNumber === null ||
+      inRange(lineNumber);
     if (!keep) {
       skipped += 1;
       continue;

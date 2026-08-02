@@ -18,4 +18,25 @@ export const handlers: RequestHandler[] = [
   http.get(`${GITHUB_API_ORIGIN}/user`, () =>
     HttpResponse.json({ login: "translator", avatar_url: null, html_url: null }),
   ),
+
+  // The review surface always asks for the conversation and the Viewed state,
+  // so an empty answer is the baseline rather than something each test repeats.
+  http.get(`${GITHUB_API_ORIGIN}/repos/:owner/:repo/pulls/:number/comments`, () =>
+    HttpResponse.json([]),
+  ),
+  http.get(`${GITHUB_API_ORIGIN}/repos/:owner/:repo/issues/:number/comments`, () =>
+    HttpResponse.json([]),
+  ),
+  http.post(`${GITHUB_API_ORIGIN}/graphql`, () =>
+    HttpResponse.json({
+      data: {
+        repository: {
+          pullRequest: {
+            id: "PR_node",
+            files: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] },
+          },
+        },
+      },
+    }),
+  ),
 ];

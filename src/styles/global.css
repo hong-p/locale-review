@@ -62,3 +62,90 @@ a {
     scroll-behavior: auto;
   }
 }
+
+/*
+ * Control baselines.
+ *
+ * These are element selectors, not classes, so every button and field starts
+ * consistent without each component importing a shared module. plan.md 3.7
+ * rules out global *classes*; the reset layer is where element defaults belong.
+ * A component module overrides what it needs.
+ */
+
+button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-2);
+  background-color: var(--color-canvas);
+  color: var(--color-fg);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  line-height: 1.6;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--duration-fast);
+}
+
+button:hover:not(:disabled) {
+  background-color: var(--color-canvas-subtle);
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+input[type="text"],
+input[type="search"],
+input[type="password"],
+textarea,
+select {
+  padding: var(--space-1) var(--space-2);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-2);
+  background-color: var(--color-canvas);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+}
+
+textarea {
+  resize: vertical;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--color-accent-emphasis);
+  cursor: pointer;
+}
+
+input:disabled,
+textarea:disabled,
+select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+legend {
+  padding: 0;
+}
+
+/* A field label sitting directly beside its control should not look clickable
+   as a block; components that need a stacked label set their own layout. */
+label {
+  cursor: pointer;
+}
+
+hr {
+  border: 0;
+  border-top: var(--border-width) solid var(--color-border);
+}

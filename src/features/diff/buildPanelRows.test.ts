@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import type { CommentThread } from "../comments/fetchReviewComments";
 import {
   buildDiffRows,
   buildSourceRows,
   collapseToChanges,
+  outdatedThreads,
   rowChangeAnchors,
   searchMatches,
 } from "./buildPanelRows";
@@ -113,5 +115,83 @@ describe("searchMatches", () => {
 
   it("matches non-ASCII text", () => {
     expect(searchMatches(buildSourceRows("스토리지 볼륨\n다른 줄\n"), "볼륨")).toEqual([0]);
+  });
+});
+
+describe("anchoring conversations to lines", () => {
+  const lines = computeLineDiff("a\nold\nc\n", "a\nnew\nc\n");
+  const patch = parsePatch("@@ -1,3 +1,3 @@\n a\n-old\n+new\n c");
+
+  const thread = (overrides: Partial<CommentThread>): CommentThread => ({
+    rootId: 1,
+    path: "a.md",
+    line: 2,
+    side: "RIGHT",
+    outdated: false,
+    comments: [],
+    ...overrides,
+  });
+
+  it("places a thread on the line it answers", () => {
+    const rows = buildDiffRows(lines, "after", { threads: [thread({ line: 2 })], patch });
+
+    const anchored = rows.filter((row) => row.threads.length > 0);
+    expect(anchored).toHaveLength(1);
+    expect(anchored[0].line.afterLine).toBe(2);
+  });
+
+  it("keeps a before-side thread off the after panel", () => {
+    // A comment written on the removed text belongs beside the removed text.
+    const left = thread({ side: "LEFT", line: 2 });
+
+    expect(
+      buildDiffRows(lines, "after", { threads: [left], patch }).every(
+        (r) => r.threads.length === 0,
+      ),
+    ).toBe(true);
+    expect(
+      buildDiffRows(lines, "before", { threads: [left], patch }).some((r) => r.threads.length > 0),
+    ).toBe(true);
+  });
+
+  it("leaves an outdated thread unanchored", () => {
+    const rows = buildDiffRows(lines, "after", { threads: [thread({ line: null })], patch });
+
+    expect(rows.every((row) => row.threads.length === 0)).toBe(true);
+    expect(outdatedThreads([thread({ line: null })])).toHaveLength(1);
+  });
+
+  it("marks only the lines GitHub's patch accepts as commentable", () => {
+    const rows = buildDiffRows(lines, "after", { patch });
+
+    // Every line of this small file is inside the single hunk.
+    expect(rows.every((row) => row.canComment)).toBe(true);
+  });
+
+  it("marks nothing commentable without a patch", () => {
+    // plan.md 4.9: a file GitHub gave no patch for takes no inline comments.
+    expect(buildDiffRows(lines, "after").every((row) => row.canComment)).toBe(false);
+  });
+
+  it("never offers a comment on the source panel", () => {
+    // The source file is not part of the pull request diff.
+    expect(buildSourceRows("a\nb\n").every((row) => !row.canComment)).toBe(true);
+  });
+});
+
+describe("collapseToChanges with conversations", () => {
+  it("keeps an unchanged line that carries a comment", () => {
+    // Compressing it away would make an existing comment vanish.
+    const file = Array.from({ length: 40 }, (_, i) => `line ${i + 1}`).join("\n");
+    const lines = computeLineDiff(`${file}\n`, `${file.replace("line 20", "line 20 edited")}\n`);
+    const { hunks } = parsePatch("@@ -17,5 +17,5 @@\n l\n l\n-line 20\n+line 20 edited\n l\n l");
+
+    const rows = buildDiffRows(lines, "after", {
+      threads: [{ rootId: 9, path: "a.md", line: 2, side: "RIGHT", outdated: false, comments: [] }],
+    });
+    const collapsed = collapseToChanges(rows, hunks, "RIGHT");
+
+    // Line 2 is far outside the hunk, so only the comment keeps it.
+    expect(collapsed.some((row) => row.line.afterLine === 2)).toBe(true);
   });
 });

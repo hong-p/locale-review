@@ -1,0 +1,121 @@
+/*
+ * The full-height review shell (design 2026-08-02).
+ *
+ * The header and sidebar hold their place while the diff fills what is left,
+ * so panel scrolling and page scrolling never compete. Below the breakpoint the
+ * grid collapses to one column and the sidebar becomes a disclosure.
+ */
+
+.shell {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  /* dvh, not vh: a mobile browser reports a taller viewport than it shows
+     while its chrome is on screen. */
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: var(--border-width) solid var(--color-border);
+  background-color: var(--color-canvas-subtle);
+}
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.repository {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-muted);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.number {
+  color: var(--color-fg-muted);
+  font-weight: 400;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-muted);
+}
+
+.branches {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+}
+
+/* Pushes the actions to the far edge without a spacer element. */
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.sidebarToggle {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .sidebarToggle {
+    display: inline-flex;
+  }
+
+  .header {
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .title {
+    font-size: var(--font-size-base);
+  }
+}
+
+/*
+ * The pull request state. GitHub uses colour alone; plan.md 7 does not allow
+ * that, so the badge always carries the word and colour only reinforces it.
+ */
+.badge {
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-3);
+  border: var(--border-width) solid currentcolor;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.open {
+  color: var(--color-success-fg);
+}
+
+.closed {
+  color: var(--color-danger-fg);
+}
+
+.merged {
+  color: var(--color-accent-fg);
+}
+
+.draft {
+  color: var(--color-fg-muted);
+}

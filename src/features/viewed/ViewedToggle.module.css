@@ -1,0 +1,15 @@
+.viewed {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-2);
+  background-color: var(--color-canvas);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+.viewed label {
+  font-weight: 600;
+}

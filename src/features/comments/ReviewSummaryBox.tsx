@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 
 import { messages } from "../../messages/en";
+import styles from "./ReviewSummaryBox.module.css";
 import type { ReviewEvent } from "./submitReview";
 
 /**
@@ -58,28 +59,33 @@ export function ReviewSummaryBox({
   };
 
   return (
-    <section aria-labelledby={`${bodyId}-heading`}>
-      <h2 id={`${bodyId}-heading`}>{messages.review.heading}</h2>
+    <section className={styles.box} aria-labelledby={`${bodyId}-heading`}>
+      <h2 id={`${bodyId}-heading`} className={styles.label}>
+        {messages.review.heading}
+      </h2>
 
       {pendingCommentCount > 0 && (
-        <p>
+        <p className={styles.pending}>
           {messages.review.pendingCount} {pendingCommentCount}
         </p>
       )}
 
-      <label htmlFor={bodyId}>{messages.review.bodyLabel}</label>
+      <label htmlFor={bodyId} className={styles.label}>
+        {messages.review.bodyLabel}
+      </label>
       <textarea
         id={bodyId}
+        className={styles.textarea}
         value={body}
         rows={4}
         disabled={!canSubmit}
         onChange={(changeEvent) => onBodyChange(changeEvent.target.value)}
       />
 
-      <fieldset disabled={!canSubmit}>
+      <fieldset className={styles.verdicts} disabled={!canSubmit}>
         <legend>{messages.review.verdictLegend}</legend>
         {EVENTS.map((entry) => (
-          <label key={entry.event}>
+          <label key={entry.event} className={styles.verdict}>
             <input
               type="radio"
               name="review-event"
@@ -95,7 +101,7 @@ export function ReviewSummaryBox({
       </fieldset>
 
       {needsConfirmation && (
-        <div role="alert">
+        <div role="alert" className={styles.warning}>
           <p>
             {messages.review.localeWarning} {unreviewedLocales.join(", ")}
           </p>
@@ -112,14 +118,19 @@ export function ReviewSummaryBox({
 
       <button
         type="button"
+        className={styles.submit}
         disabled={!canSubmit || isBusy || blocked}
         onClick={() => void submit()}
       >
         {isBusy ? messages.review.submitting : messages.review.submit}
       </button>
 
-      {!canSubmit && <p>{messages.pullRequest.readOnlyBody}</p>}
-      {error !== null && <p role="alert">{error}</p>}
+      {!canSubmit && <p className={styles.readOnly}>{messages.pullRequest.readOnlyBody}</p>}
+      {error !== null && (
+        <p role="alert" className={styles.error}>
+          {error}
+        </p>
+      )}
     </section>
   );
 }

@@ -5,6 +5,7 @@ import type { PullRequestRef } from "../../api/types";
 import { messages } from "../../messages/en";
 import { useToken } from "../auth/TokenContext";
 import { type FreshnessSnapshot, fetchFreshness, hasChanged, onTabVisible } from "./freshness";
+import styles from "./RefreshBanner.module.css";
 
 /**
  * Manual refresh, and the banner that appears when GitHub moved on
@@ -57,9 +58,9 @@ export function RefreshBanner({ pullRequestRef, current, hasUnsentWork }: Refres
   };
 
   return (
-    <div>
+    <div className={styles.banner}>
       {staleSince && (
-        <p role="status">
+        <p role="status" className={styles.stale}>
           {messages.refresh.newChanges}{" "}
           <button type="button" onClick={requestReload}>
             {messages.refresh.reload}
@@ -72,14 +73,16 @@ export function RefreshBanner({ pullRequestRef, current, hasUnsentWork }: Refres
       </button>
 
       {confirming && (
-        <div role="alert">
+        <div role="alert" className={styles.confirm}>
           <p>{messages.refresh.unsentWarning}</p>
-          <button type="button" onClick={reload}>
-            {messages.refresh.reloadAnyway}
-          </button>
-          <button type="button" onClick={() => setConfirming(false)}>
-            {messages.refresh.keepEditing}
-          </button>
+          <div className={styles.confirmActions}>
+            <button type="button" onClick={reload}>
+              {messages.refresh.reloadAnyway}
+            </button>
+            <button type="button" onClick={() => setConfirming(false)}>
+              {messages.refresh.keepEditing}
+            </button>
+          </div>
         </div>
       )}
     </div>

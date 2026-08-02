@@ -14,3 +14,30 @@ afterEach(() => {
 });
 
 afterAll(() => server.close());
+
+/**
+ * jsdom ships `<dialog>` without `showModal` or `close`.
+ *
+ * The review form relies on the native element for its focus trap and Esc
+ * handling, which is the right choice in a browser; the browser tests cover
+ * that behaviour. Here the methods only need to move the `open` attribute so
+ * the component's state and the DOM agree.
+ */
+if (typeof HTMLDialogElement !== "undefined") {
+  const proto = HTMLDialogElement.prototype as HTMLDialogElement & {
+    showModal?: () => void;
+    close?: () => void;
+  };
+
+  if (!proto.showModal) {
+    proto.showModal = function showModal(this: HTMLDialogElement) {
+      this.setAttribute("open", "");
+    };
+  }
+  if (!proto.close) {
+    proto.close = function close(this: HTMLDialogElement) {
+      this.removeAttribute("open");
+      this.dispatchEvent(new Event("close"));
+    };
+  }
+}

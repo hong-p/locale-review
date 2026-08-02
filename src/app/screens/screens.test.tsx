@@ -212,8 +212,9 @@ describe("PullRequestScreen", () => {
     expect(screen.getByText("acme/docs")).toBeVisible();
     expect(screen.getByText(/main ← ko-install/)).toBeVisible();
     expect(screen.getByText("translator", { exact: false })).toBeVisible();
-    // plan.md 7: state is text, not colour alone.
-    expect(screen.getByText("Open", { selector: "p" })).toBeVisible();
+    // plan.md 7: state is a word, not colour alone. It is a badge in the
+    // header now rather than a paragraph.
+    expect(screen.getByText("Open", { selector: "span" })).toBeVisible();
   });
 
   it("blocks loading and explains why when there is no token", async () => {

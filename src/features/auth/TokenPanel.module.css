@@ -1,0 +1,80 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-3);
+  background-color: var(--color-canvas);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.label {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.row input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+}
+
+.remember {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.hint,
+.guidance {
+  margin: 0;
+  color: var(--color-fg-muted);
+  font-size: var(--font-size-sm);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-2);
+  font-size: var(--font-size-sm);
+}
+
+.ok {
+  border: var(--border-width) solid var(--color-success-fg);
+  color: var(--color-fg);
+}
+
+.failed {
+  border: var(--border-width) solid var(--color-danger-fg);
+  color: var(--color-fg);
+}
+
+.avatar {
+  border-radius: 50%;
+}

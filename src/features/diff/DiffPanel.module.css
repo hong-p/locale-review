@@ -32,10 +32,19 @@
   max-height: 60vh;
 }
 
+/*
+ * Flex rows rather than a CSS table.
+ *
+ * A table row cannot span its columns without colspan, which squeezed a
+ * comment into the line-number column, and `position: relative` on a
+ * table-row does not reliably establish a containing block, which left the
+ * add-comment button unplaceable. Fixed gutter widths keep the numbers
+ * aligned without a table.
+ */
 .lines {
-  display: table;
+  display: flex;
+  flex-direction: column;
   width: 100%;
-  border-collapse: collapse;
   font-family: var(--font-mono);
   font-size: var(--font-size-base);
   line-height: var(--line-height-diff);
@@ -43,12 +52,13 @@
 }
 
 .line {
-  display: table-row;
+  position: relative;
+  display: flex;
+  align-items: flex-start;
 }
 
 .number {
-  display: table-cell;
-  width: 1%;
+  flex: 0 0 4ch;
   padding: 0 var(--space-2);
   text-align: right;
   vertical-align: top;
@@ -63,9 +73,8 @@
 }
 
 .marker {
-  display: table-cell;
-  width: 1ch;
-  padding-left: var(--space-2);
+  flex: 0 0 2ch;
+  padding-left: var(--space-1);
   vertical-align: top;
   user-select: none;
   direction: ltr;
@@ -73,7 +82,8 @@
 }
 
 .text {
-  display: table-cell;
+  flex: 1;
+  min-width: 0;
   padding: 0 var(--space-2);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -117,13 +127,12 @@
 }
 
 .gap {
-  display: table-row;
   color: var(--color-fg-muted);
   background-color: var(--color-canvas-inset);
 }
 
 .gapText {
-  display: table-cell;
+  display: block;
   padding: var(--space-1) var(--space-3);
   font-size: var(--font-size-sm);
   text-align: center;
@@ -133,4 +142,68 @@
   padding: var(--space-5);
   text-align: center;
   color: var(--color-fg-muted);
+}
+
+/*
+ * A conversation sits in its own full-width row directly beneath the line it
+ * answers, the way GitHub places one, so the anchor is unambiguous.
+ */
+/*
+ * A conversation is full width and indented to line up with the code, not the
+ * gutter, so it reads as a reply to the text rather than to the number.
+ */
+.threadRow {
+  background-color: var(--color-canvas-subtle);
+}
+
+.threadCell {
+  margin-left: calc(4ch + 2ch + var(--space-4));
+  padding: var(--space-2) var(--space-3) var(--space-2) 0;
+  border-top: var(--border-width) solid var(--color-border-muted);
+  border-bottom: var(--border-width) solid var(--color-border-muted);
+  font-family: var(--font-sans);
+  /* A conversation is prose, not code, so it wraps normally. */
+  white-space: normal;
+}
+
+/*
+ * Revealed on hover or focus so it does not clutter every line, but always
+ * reachable by keyboard.
+ */
+/*
+ * Always visible on a commentable line rather than revealed on hover. Hiding
+ * it meant the only way to write an inline comment was to discover it by
+ * accident, and it is invisible to touch entirely.
+ */
+.addComment {
+  flex: 0 0 auto;
+  align-self: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  min-height: 0;
+  margin-right: var(--space-2);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-1);
+  background-color: var(--color-accent-emphasis);
+  color: var(--color-fg-on-emphasis);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  font-weight: 700;
+  line-height: 1;
+  opacity: 0.45;
+  transition: opacity var(--duration-fast);
+}
+
+.line:hover .addComment,
+.addComment:focus-visible {
+  opacity: 1;
+}
+
+/* Holds the gutter width when no button is shown, so text never shifts
+   between commentable and non-commentable lines. */
+.addCommentSpacer {
+  flex: 0 0 auto;
+  width: 1.4rem;
+  margin-right: var(--space-2);
 }
